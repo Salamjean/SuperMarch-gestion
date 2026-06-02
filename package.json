@@ -1,0 +1,39 @@
+{
+    "$schema": "https://www.schemastore.org/package.json",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "build": "vite build",
+        "dev": "concurrently \"php artisan serve\" \"vite\" \"electron .\"",
+        "start": "electron .",
+        "pack": "electron-builder --dir",
+        "dist": "electron-builder"
+    },
+    "devDependencies": {
+        "@tailwindcss/vite": "^4.0.0",
+        "axios": ">=1.11.0 <=1.14.0",
+        "concurrently": "^9.0.1",
+        "electron": "^41.2.0",
+        "electron-builder": "^26.8.1",
+        "laravel-vite-plugin": "^3.0.0",
+        "tailwindcss": "^4.0.0",
+        "vite": "^8.0.0"
+    },
+    "name": "app-mobile",
+    "version": "1.0.0",
+    "main": "main.js",
+    "build": {
+        "appId": "com.appmobile.pos",
+        "productName": "SupermarchePOS",
+        "win": {
+            "target": "nsis"
+        },
+        "nsis": {
+            "oneClick": false,
+            "allowToChangeInstallationDirectory": true
+        }
+    },
+    "keywords": [],
+    "author": "",
+    "license": "ISC"
+}
