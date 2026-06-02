@@ -9,7 +9,7 @@ const __dirname = path.dirname(__filename);
 // Nécessaire pour que getUserMedia fonctionne sur http://127.0.0.1
 app.commandLine.appendSwitch(
     "unsafely-treat-insecure-origin-as-secure",
-    "http://127.0.0.1:8000",
+    "http://127.0.0.1:8000,http://fescads.com",
 );
 app.commandLine.appendSwitch("enable-features", "WebRTCPipeWireCapturer");
 
@@ -68,7 +68,7 @@ function createWindow() {
     win.show();
     win.setMenuBarVisibility(false); // Cache la barre de menu pour le look POS
 
-    win.loadURL("http://127.0.0.1:8000");
+    win.loadURL("https://fescads.com");
 
     // 🔥 Ouvre les liens externes dans le navigateur
     win.webContents.setWindowOpenHandler(({ url }) => {

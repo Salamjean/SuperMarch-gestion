@@ -35,9 +35,23 @@ class EmployeeController extends Controller
             'password'   => ['required', 'confirmed', Password::min(8)],
         ]);
 
+        // Générer le code ID unique (EMP-XXXX) en incluant les employés archivés/supprimés
+        $prefix = 'EMP';
+        $latestUser = User::withTrashed()
+            ->where('login_code', 'like', $prefix . '-%')
+            ->orderBy('id', 'desc')
+            ->first();
+
+        $nextNumber = 1;
+        if ($latestUser && preg_match('/-(\d+)$/', $latestUser->login_code, $matches)) {
+            $nextNumber = ((int)$matches[1]) + 1;
+        }
+        $loginCode = $prefix . '-' . str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
+
         User::create([
             'name'       => $validated['name'],
             'email'      => $validated['email'],
+            'login_code' => $loginCode,
             'phone'      => $validated['phone'] ?? null,
             'position'   => $validated['position'] ?? null,
             'department' => $validated['department'] ?? null,

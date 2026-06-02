@@ -25,6 +25,9 @@
     "build": {
         "appId": "com.appmobile.pos",
         "productName": "SupermarchePOS",
+        "directories": {
+            "output": "dist-production"
+        },
         "win": {
             "target": "nsis"
         },
