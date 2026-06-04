@@ -59,8 +59,8 @@
                     @if ($product->image)
                         <img src="{{ asset('storage/' . $product->image) }}" alt="{{ $product->name }}">
                     @else
-                        <div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: #e2e8f0; color: #94a3b8;">
-                            <i class="fa-solid fa-image" style="font-size: 32px;"></i>
+                        <div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #004d99, #1a6bbf); color: white; font-weight: 800; font-size: 48px;">
+                            {{ strtoupper(mb_substr($product->name, 0, 1)) }}
                         </div>
                     @endif
                 </div>

@@ -81,8 +81,12 @@
                                             @if ($req->product && $req->product->image)
                                                 <img src="{{ asset('storage/' . $req->product->image) }}"
                                                     style="width: 100%; height: 100%; object-fit: cover;">
+                                            @elseif($req->product)
+                                                <div style="width:100%; height:100%; background: linear-gradient(135deg, #004d99, #1a6bbf); display:flex; align-items:center; justify-content:center; color:white; font-weight:800; font-size:16px;">
+                                                    {{ strtoupper(mb_substr($req->product->name, 0, 1)) }}
+                                                </div>
                                             @else
-                                                <i class="fa-solid fa-image" style="color: #cbd5e1; font-size: 14px;"></i>
+                                                <i class="fa-solid fa-box" style="color: #cbd5e1; font-size: 14px;"></i>
                                             @endif
                                         </div>
                                     </td>

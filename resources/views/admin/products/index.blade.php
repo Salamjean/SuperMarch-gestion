@@ -59,9 +59,8 @@
                                                 <img src="{{ asset('storage/' . $product->image) }}" alt="{{ $product->name }}"
                                                     style="width:45px; height:45px; border-radius:10px; object-fit:cover; border:1px solid #e2eaf3;">
                                             @else
-                                                <div
-                                                    style="width:45px; height:45px; border-radius:10px; background:#f0f4f8; display:flex; align-items:center; justify-content:center; color:#cbd5e1; border:1px solid #e2eaf3;">
-                                                    <i class="fa-solid fa-image" style="font-size:18px;"></i>
+                                                <div style="width:45px; height:45px; border-radius:10px; background: linear-gradient(135deg, #004d99, #1a6bbf); display:flex; align-items:center; justify-content:center; color:white; font-weight:800; font-size:18px; border:1px solid #e2eaf3; flex-shrink:0;">
+                                                    {{ strtoupper(mb_substr($product->name, 0, 1)) }}
                                                 </div>
                                             @endif
                                         </div>

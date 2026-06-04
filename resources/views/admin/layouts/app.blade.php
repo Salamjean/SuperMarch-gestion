@@ -120,6 +120,12 @@
             flex: 1;
             padding: 0 12px 25px;
             overflow-y: auto;
+            scrollbar-width: none;        /* Firefox */
+            -ms-overflow-style: none;     /* IE/Edge */
+        }
+
+        .sidebar-nav::-webkit-scrollbar {
+            display: none;                /* Chrome, Safari */
         }
 
         .sidebar-section-label {
