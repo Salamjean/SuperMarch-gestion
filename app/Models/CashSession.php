@@ -27,11 +27,16 @@ class CashSession extends Model
 
     public function user()
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(User::class)->withTrashed();
     }
 
     public function sales()
     {
         return $this->hasMany(Sale::class);
+    }
+
+    public function debtPayments()
+    {
+        return $this->hasMany(DebtPayment::class);
     }
 }

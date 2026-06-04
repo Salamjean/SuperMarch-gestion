@@ -45,6 +45,14 @@ class AdminCashSessionController extends Controller
             ->oldest()
             ->get();
 
+        // Tous les encaissements de dettes associés à cette session
+        $debtPayments = \App\Models\DebtPayment::with(['customer'])
+            ->where('cash_session_id', $id)
+            ->oldest()
+            ->get();
+
+        $totalDebtPayments = $debtPayments->sum('amount');
+
         // Statistiques de la session
         $totalSalesCount = $sales->where('status', 'completed')->count();
         $totalSalesAmount = $sales->where('status', 'completed')->sum('total_amount');
@@ -65,7 +73,9 @@ class AdminCashSessionController extends Controller
             'totalCardSales',
             'totalCreditSales',
             'totalRefundsCount',
-            'totalRefundsAmount'
+            'totalRefundsAmount',
+            'debtPayments',
+            'totalDebtPayments'
         ));
     }
 }

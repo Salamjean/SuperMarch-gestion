@@ -52,7 +52,7 @@
                                 </div>
                                 <div
                                     style="display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted);">
-                                    <span>Par: {{ $req->user->name }}</span>
+                                    <span>Par: {{ $req->user?->name ?? 'Inconnu' }}</span>
                                     <span>{{ $req->created_at->diffForHumans() }}</span>
                                 </div>
                             </div>
@@ -74,10 +74,10 @@
         </span>
 
         <!-- Nom utilisateur -->
-        <span class="navbar-username">
+        <a href="{{ route('admin.profile.show') }}" class="navbar-username" style="text-decoration: none; color: inherit; display: flex; align-items: center; gap: 6px; transition: opacity 0.2s;" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">
             <i class="fa-solid fa-circle-user" style="font-size:18px; color:#004d99"></i>
             {{ auth()->user()->name }}
-        </span>
+        </a>
 
     </div>
 </header>
@@ -120,7 +120,6 @@
                 min: 1,
                 step: 1
             },
-            inputValue: 50,
             showCancelButton: true,
             confirmButtonText: 'Ajouter au Stock',
             cancelButtonText: 'Annuler',
@@ -219,37 +218,6 @@
                             confirmButtonColor: 'var(--blue)'
                         });
                     });
-            }
-        });
-    } <
-    /div>
-    `;
-                            }
-                        }
-                    }, 300);
-                }
-            } else {
-                button.disabled = false;
-                button.innerHTML = originalContent;
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Erreur',
-                    text: data.message,
-                    confirmButtonColor: 'var(--blue)'
-                });
-            }
-        })
-        .catch(error => {
-            console.error("Erreur:", error);
-            button.disabled = false;
-            button.innerHTML = originalContent;
-            Swal.fire({
-                icon: 'error',
-                title: 'Erreur',
-                text: 'Une erreur est survenue lors de la résolution.',
-                confirmButtonColor: 'var(--blue)'
-            });
-        });
     }
 </script>
 

@@ -40,15 +40,14 @@
         <div
             style="background: white; border: 1px solid var(--border); border-radius: 12px; padding: 20px; display: flex; align-items: center; gap: 15px;">
             <div
-                style="background: #fef3c7; color: #d97706; width: 48px; height: 48px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px;">
-                <i class="fa-solid fa-star"></i>
+                style="background: #fffbeb; color: #d97706; width: 48px; height: 48px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px;">
+                <i class="fa-solid fa-user-clock"></i>
             </div>
             <div>
                 <span
-                    style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; display: block;">Points
-                    octroyés</span>
-                <span style="font-size: 20px; font-weight: 800; color: #d97706;">⭐
-                    {{ number_format(\App\Models\Customer::sum('loyalty_points'), 0, ',', ' ') }} pts</span>
+                    style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; display: block;">Clients endettés</span>
+                <span style="font-size: 20px; font-weight: 800; color: #d97706;">
+                    {{ \App\Models\Customer::where('debt_balance', '>', 0)->count() }} Clients</span>
             </div>
         </div>
 
@@ -141,9 +140,7 @@
                             <th
                                 style="padding: 14px 20px; font-size: 11.5px; font-weight: 700; color: #475569; text-transform: uppercase;">
                                 Coordonnées</th>
-                            <th
-                                style="padding: 14px 20px; font-size: 11.5px; font-weight: 700; color: #475569; text-transform: uppercase; text-align: center;">
-                                Fidélité</th>
+
                             <th
                                 style="padding: 14px 20px; font-size: 11.5px; font-weight: 700; color: #475569; text-transform: uppercase; text-align: center;">
                                 Crédit actif</th>
@@ -171,6 +168,9 @@
                                                 style="font-weight: 700; color: #1e293b; text-decoration: none; font-size: 14px;">
                                                 {{ $cust->name }}
                                             </a>
+                                            @if ($cust->is_credit_blocked)
+                                                <span style="display: inline-flex; align-items: center; gap: 3px; font-size: 10px; color: #dc2626; background: #fee2e2; border: 1px solid #fecdd3; border-radius: 4px; padding: 1px 4px; font-weight: 800; margin-left: 5px;" title="Crédit bloqué"><i class="fa-solid fa-lock"></i> Bloqué</span>
+                                            @endif
                                             <span style="display: block; font-size: 11px; color: var(--text-muted);">ID :
                                                 #{{ $cust->id }}</span>
                                         </div>
@@ -186,12 +186,7 @@
                                             style="font-size: 10px; color: #94a3b8; margin-right: 4px;"></i>
                                         {{ $cust->email ?? '— Non renseigné' }}</span>
                                 </td>
-                                <td style="padding: 14px 20px; text-align: center;">
-                                    <span class="badge"
-                                        style="background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; font-weight: 700; font-size: 12px; padding: 4px 8px; border-radius: 6px;">
-                                        ⭐ {{ $cust->loyalty_points }} pts
-                                    </span>
-                                </td>
+
                                 <td style="padding: 14px 20px; text-align: center;">
                                     @if ($cust->debt_balance > 0)
                                         <span
@@ -229,19 +224,15 @@
                                                 <i class="fa-solid fa-hand-holding-dollar"></i>
                                             </button>
                                         @endif
-                                        <button type="button" class="btn-icon btn-icon-red"
-                                            style="background-color: #fee2e2; color: #dc2626; border: none; width: 32px; height: 38px; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer;"
-                                            title="Supprimer"
-                                            onclick="confirmDelete('{{ $cust->id }}', '{{ addslashes($cust->name) }}')">
-                                            <i class="fa-solid fa-trash"></i>
-                                        </button>
+                                        <form action="{{ route('admin.customers.toggle-credit-block', $cust->id) }}" method="POST" style="display:inline; margin:0;">
+                                            @csrf
+                                            <button type="submit" class="btn-icon"
+                                                style="background-color: {{ $cust->is_credit_blocked ? '#ecfdf5' : '#fee2e2' }}; color: {{ $cust->is_credit_blocked ? '#10b981' : '#ef4444' }}; border: none; width: 32px; height: 38px; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer;"
+                                                title="{{ $cust->is_credit_blocked ? 'Débloquer le crédit' : 'Bloquer le crédit' }}">
+                                                <i class="fa-solid {{ $cust->is_credit_blocked ? 'fa-unlock' : 'fa-lock' }}"></i>
+                                            </button>
+                                        </form>
                                     </div>
-
-                                    <form id="delete-form-{{ $cust->id }}"
-                                        action="{{ route('admin.customers.destroy', $cust->id) }}" method="POST"
-                                        style="display:none;">
-                                        @csrf @method('DELETE')
-                                    </form>
 
                                     <form id="pay-debt-form-{{ $cust->id }}"
                                         action="{{ route('admin.customers.pay-debt', $cust->id) }}" method="POST"
@@ -265,22 +256,7 @@
 
     @push('scripts')
         <script>
-            function confirmDelete(id, name) {
-                Swal.fire({
-                    title: 'Supprimer ce client ?',
-                    html: `Voulez-vous vraiment supprimer le client : <b>${name}</b> ?<br><span style="color:var(--danger); font-size:12px;">Cette opération est irréversible.</span>`,
-                    icon: 'warning',
-                    showCancelButton: true,
-                    confirmButtonColor: '#dc2626',
-                    cancelButtonColor: '#6b7280',
-                    confirmButtonText: 'Oui, supprimer !',
-                    cancelButtonText: 'Annuler'
-                }).then((result) => {
-                    if (result.isConfirmed) {
-                        document.getElementById('delete-form-' + id).submit();
-                    }
-                });
-            }
+
 
             function openPayDebtModal(id, name, maxDebt) {
                 Swal.fire({

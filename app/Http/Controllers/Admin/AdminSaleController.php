@@ -82,15 +82,9 @@ class AdminSaleController extends Controller
                 ]);
             }
 
-            // Gérer la fidélité et la dette si client associé
+            // Gérer la dette si client associé
             if ($sale->customer_id && $sale->customer) {
                 $customer = $sale->customer;
-
-                // Déduire les points gagnés lors de cette vente
-                $points = floor($sale->total_amount / 10);
-                if ($points > 0) {
-                    $customer->decrement('loyalty_points', min($customer->loyalty_points, $points));
-                }
 
                 // Si c'était à crédit, on réduit la dette du client
                 if ($sale->payment_method === 'credit') {

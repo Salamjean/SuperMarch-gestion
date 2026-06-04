@@ -92,6 +92,9 @@
     <!-- History View -->
     @include('employee.historique')
 
+    <!-- Credits View -->
+    @include('employee.credits')
+
     <!-- Statistics View -->
     @include('employee.statistique')
 
@@ -139,9 +142,9 @@
             </div>
             <select id="cart-customer-id"
                 style="width: 100%; border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; font-size: 13px; color: var(--text); background: white; outline: none; cursor: pointer;">
-                <option value="">Client de passage (Anonyme)</option>
+                <option value="" data-blocked="0">Client de passage (Anonyme)</option>
                 @foreach ($customers as $c)
-                    <option value="{{ $c->id }}">{{ $c->name }} {{ $c->phone ? '(' . $c->phone . ')' : '' }}
+                    <option value="{{ $c->id }}" data-blocked="{{ $c->is_credit_blocked ? '1' : '0' }}">{{ $c->name }} {{ $c->phone ? '(' . $c->phone . ')' : '' }}
                     </option>
                 @endforeach
             </select>
@@ -178,13 +181,14 @@
     <!-- Receipt Template (Hidden) -->
     <div id="receipt-print">
         <div style="text-align: center; margin-bottom: 15px;">
-            <p style="margin: 0; font-size: 18px; font-weight: normal;">SUPERMARCHÉ PRO</p>
-            <p style="margin: 5px 0; font-size: 11px;">Abidjan, Cocody Riviera Palmeraie<br>Tel: +225 07 00 00 00 00
+            <p style="margin: 0; font-size: 18px; font-weight: normal;">{{ $storeSettings->store_name }}</p>
+            <p style="margin: 5px 0; font-size: 11px;">{{ $storeSettings->address }}<br>Tel: {{ $storeSettings->phone }}@if($storeSettings->email)<br>Email: {{ $storeSettings->email }}@endif
             </p>
             <div style="border-bottom: 1px dashed #000; margin: 10px 0;"></div>
             <p style="margin: 5px 0;" id="receipt-ref">REF: #SAL-000000</p>
             <p style="margin: 5px 0;" id="receipt-date">Date: 27/04/2026 00:00</p>
             <p style="margin: 5px 0; font-size: 11px; display: none;" id="receipt-customer">Client: </p>
+            <p style="margin: 5px 0; font-size: 11px;" id="receipt-cashier">Caissier: —</p>
         </div>
 
         <table style="width: 100%; font-size: 11px; border-collapse: collapse;">
@@ -221,7 +225,85 @@
 
         <div style="text-align: center; margin-top: 20px; font-size: 10px;">
             <div id="receipt-qrcode" style="display: flex; justify-content: center; margin-bottom: 10px;"></div>
-            <p>Merci de votre visite !<br>A bientôt.</p>
+            <p style="margin: 5px 0; line-height: 1.4;">{{ $storeSettings->invoice_footer ?? "Merci de votre visite ! A bientôt." }}</p>
+        </div>
+    </div>
+
+    <!-- A4 Receipt Template (Hidden) -->
+    <div id="receipt-print-a4">
+        <div style="font-family: 'Inter', sans-serif; color: #1e293b; padding: 20px; line-height: 1.5;">
+            <!-- Header -->
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px;">
+                <div>
+                    <h1 style="margin: 0 0 5px 0; font-size: 24px; font-weight: 800; color: #004d99; letter-spacing: -0.5px;">{{ $storeSettings->store_name }}</h1>
+                    <p style="margin: 0; font-size: 12px; color: #64748b; line-height: 1.6;">
+                        {{ $storeSettings->address }}<br>
+                        Tel: {{ $storeSettings->phone }}@if($storeSettings->email) / Email: {{ $storeSettings->email }}@endif
+                    </p>
+                </div>
+                <div style="text-align: right;">
+                    <h2 style="margin: 0; color: #004d99; font-size: 20px; font-weight: 800;">FACTURE</h2>
+                    <p style="margin: 5px 0 0 0; font-size: 13px; color: #64748b;">
+                        Réf : <strong id="receipt-a4-ref">#SAL-000000</strong><br>
+                        Date : <span id="receipt-a4-date">27/04/2026 00:00</span>
+                    </p>
+                </div>
+            </div>
+
+            <div style="border-bottom: 2px solid #f1f5f9; margin: 20px 0;"></div>
+
+            <!-- Meta info grid -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px;">
+                <div>
+                    <h3 style="margin: 0 0 8px 0; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #64748b;">Client :</h3>
+                    <p id="receipt-a4-customer-box" style="margin: 0; font-size: 14px;"><strong>Client de Passage</strong></p>
+                </div>
+                <div style="text-align: right;">
+                    <h3 style="margin: 0 0 8px 0; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #64748b;">Opérateur :</h3>
+                    <p style="margin: 0 0 5px 0; font-size: 14px;"><strong id="receipt-a4-cashier">Caissier: —</strong></p>
+                    <p style="margin: 0 0 3px 0; font-size: 12px; color: #64748b;">Rôle : Caissier / POS</p>
+                    <p style="margin: 0; font-size: 12px; color: #64748b;">Mode de paiement : <strong id="receipt-a4-method">Espèces</strong></p>
+                </div>
+            </div>
+
+            <!-- Table -->
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 30px;">
+                <thead>
+                    <tr style="background: #f8fafc; border-bottom: 2px solid #e2e8f0; text-align: left;">
+                        <th style="padding: 12px 10px; font-size: 11px; font-weight: 700; text-transform: uppercase; color: #475569;">Désignation de l'article</th>
+                        <th style="text-align: center; width: 120px; padding: 12px 10px; font-size: 11px; font-weight: 700; text-transform: uppercase; color: #475569;">Prix unitaire</th>
+                        <th style="text-align: center; width: 80px; padding: 12px 10px; font-size: 11px; font-weight: 700; text-transform: uppercase; color: #475569;">Quantité</th>
+                        <th style="text-align: right; width: 150px; padding: 12px 10px; font-size: 11px; font-weight: 700; text-transform: uppercase; color: #475569;">Montant Total</th>
+                    </tr>
+                </thead>
+                <tbody id="receipt-a4-items">
+                    <!-- Dynamically populated -->
+                </tbody>
+            </table>
+
+            <!-- Totaux (sans signature) -->
+            <div style="display: flex; justify-content: flex-end; margin-top: 20px;">
+                <div style="width: 300px;">
+                    <div style="display: flex; justify-content: space-between; padding: 8px 0; font-size: 13px; border-bottom: 1px solid #f1f5f9;">
+                        <span>Total Global:</span>
+                        <strong id="receipt-a4-total" style="font-size: 16px; color: #004d99;">0 FCFA</strong>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; padding: 8px 0; font-size: 13px; border-bottom: 1px solid #f1f5f9; color: #64748b;">
+                        <span>Montant Encaissé:</span>
+                        <span id="receipt-a4-received">0 FCFA</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; padding: 8px 0; font-size: 13px; border-bottom: 1px solid #f1f5f9; color: #64748b;">
+                        <span>Monnaie Rendue:</span>
+                        <span id="receipt-a4-change">0 FCFA</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <div style="margin-top: 40px; text-align: center; border-top: 1px dashed #e2e8f0; padding-top: 20px; font-size: 11px; color: #64748b; line-height: 1.5;">
+                <p id="receipt-a4-footer">{{ $storeSettings->invoice_footer ?? 'Merci pour votre confiance !' }}</p>
+                <p style="font-size: 10px; color: #94a3b8; margin-top: 10px;">{{ $storeSettings->store_name }} - Solution de Facturation Intégrée</p>
+            </div>
         </div>
     </div>
 @endpush
@@ -230,7 +312,7 @@
     <script>
         // View Switcher Logic
         function switchView(view) {
-            const views = ['caisse', 'stock', 'history', 'stats', 'profile'];
+            const views = ['caisse', 'stock', 'history', 'stats', 'profile', 'credits'];
             views.forEach(v => {
                 const el = document.getElementById('view-' + v);
                 if (el) el.style.display = (v === view) ? 'flex' : 'none';
@@ -557,8 +639,11 @@
             if (cart.length === 0) return;
 
             const total = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
-            const customerId = document.getElementById('cart-customer-id').value;
-            const customerName = document.getElementById('cart-customer-name')?.textContent || '';
+            const customerSelect = document.getElementById('cart-customer-id');
+            const selectedOption = customerSelect.options[customerSelect.selectedIndex];
+            const customerId = customerSelect.value;
+            const customerName = selectedOption ? selectedOption.text : '';
+            const isBlocked = selectedOption ? selectedOption.getAttribute('data-blocked') === '1' : false;
 
             // Step 1: Integrated dialog for Payment Method and Amount Received
             const {
@@ -572,12 +657,20 @@
                                     <p style="margin:5px 0 0 0; font-size: 22px; font-weight: 800; color: var(--success);">${total.toLocaleString()} FCFA</p>
                                     ${customerId ? `<p style="margin:5px 0 0 0; font-size:13px; color:#4b5563;"><i class="fa-solid fa-user"></i> Client : <strong>${customerName}</strong></p>` : ''}
                                 </div>
+                                ${customerId ? `
                                 <div style="margin-bottom: 15px;">
+                                    <label style="font-weight: 600; display: block; margin-bottom: 6px; color: var(--text);">Type de Vente :</label>
+                                    <select id="swal-sale-type" class="form-control" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--card);">
+                                        <option value="paiement" selected>Paiement Direct (Comptant)</option>
+                                        <option value="credit">Vente à Crédit (Compte client)</option>
+                                    </select>
+                                </div>
+                                ` : '<input type="hidden" id="swal-sale-type" value="paiement">'}
+                                <div id="payment-method-container" style="margin-bottom: 15px;">
                                     <label style="font-weight: 600; display: block; margin-bottom: 6px; color: var(--text);">Moyen de Paiement :</label>
                                     <select id="swal-payment-method" class="form-control" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--card);">
                                         <option value="cash" selected>Espèces (Cash)</option>
                                         <option value="card">Carte Bancaire / Mobile Money</option>
-                                        ${customerId ? '<option value="credit">Vente à Crédit (Compte client)</option>' : ''}
                                     </select>
                                 </div>
                                 <div id="received-amount-container" style="margin-bottom: 15px;">
@@ -592,22 +685,41 @@
                 cancelButtonText: 'Annuler',
                 confirmButtonColor: '#059669',
                 didOpen: () => {
-                    const payMethod = document.getElementById('swal-payment-method');
+                    const saleType = document.getElementById('swal-sale-type');
+                    const paymentMethodContainer = document.getElementById('payment-method-container');
+                    const receivedContainer = document.getElementById('received-amount-container');
                     const amountInput = document.getElementById('swal-amount-received');
-                    payMethod.addEventListener('change', (e) => {
-                        if (e.target.value === 'credit') {
-                            amountInput.value = 0;
-                        } else {
-                            amountInput.value = total;
-                        }
-                    });
+                    
+                    if (saleType) {
+                        const toggleFields = () => {
+                            if (saleType.value === 'credit') {
+                                if (paymentMethodContainer) paymentMethodContainer.style.display = 'none';
+                                if (receivedContainer) receivedContainer.style.display = 'none';
+                                amountInput.value = 0;
+                            } else {
+                                if (paymentMethodContainer) paymentMethodContainer.style.display = 'block';
+                                if (receivedContainer) receivedContainer.style.display = 'block';
+                                amountInput.value = total;
+                            }
+                        };
+                        saleType.addEventListener('change', toggleFields);
+                        toggleFields();
+                    }
                 },
                 preConfirm: () => {
-                    const paymentMethod = document.getElementById('swal-payment-method').value;
+                    const saleType = document.getElementById('swal-sale-type').value;
+                    const paymentMethod = saleType === 'credit' ? 'credit' : document.getElementById('swal-payment-method').value;
                     const amountInput = document.getElementById('swal-amount-received');
                     const amountReceived = parseFloat(amountInput.value || 0);
 
-                    if (paymentMethod !== 'credit' && amountReceived < total) {
+                    if (saleType === 'credit' && isBlocked) {
+                        Swal.showValidationMessage(
+                            `Ce client est bloqué pour les achats à crédit par l'administrateur.`
+                        );
+                        return false;
+                    }
+
+                    if (saleType !== 'credit' && amountReceived < total) {
                         Swal.showValidationMessage(
                             `Le montant reçu doit être supérieur ou égal à ${total.toLocaleString()} FCFA`
                         );
@@ -617,7 +729,7 @@
                     return {
                         paymentMethod: paymentMethod,
                         amountReceived: amountReceived,
-                        changeAmount: paymentMethod === 'credit' ? 0 : (amountReceived - total)
+                        changeAmount: saleType === 'credit' ? 0 : (amountReceived - total)
                     }
                 }
             });
@@ -640,83 +752,7 @@
 
             const customerIdVal = document.getElementById('cart-customer-id').value;
 
-            // Fonction auxiliaire pour formater le reçu et l'imprimer
-            function printLocalReceipt(saleObj) {
-                if (!saleObj) return;
-                const saleItems = saleObj.items || [];
-                const reference = saleObj.reference || 'INCONNUE';
-                const created_at = saleObj.created_at || new Date().toISOString();
-                const now = new Date(created_at);
-                
-                const totalAmount = parseFloat(saleObj.total_amount || saleObj.total || 0);
-                const amountReceived = parseFloat(saleObj.amount_received || saleObj.received || 0);
-                const changeAmount = parseFloat(saleObj.change_amount || saleObj.change || 0);
 
-                document.getElementById('receipt-ref').textContent = `REF: #${reference}`;
-                document.getElementById('receipt-date').textContent =
-                    `Date: ${now.toLocaleString('fr-FR')}`;
-
-                const custEl = document.getElementById('receipt-customer');
-                if (saleObj.customer) {
-                    custEl.textContent = `Client: ${saleObj.customer.name}`;
-                    custEl.style.display = 'block';
-                } else {
-                    custEl.style.display = 'none';
-                }
-
-                const receiptItems = document.getElementById('receipt-items');
-                receiptItems.innerHTML = saleItems.map(item => {
-                    const name = (item.product ? item.product.name : (item.name || 'Produit')).toUpperCase();
-                    const qty = parseFloat(item.quantity || item.qty || 0);
-                    const unitPrice = parseFloat(item.unit_price || item.price || 0);
-                    const lineTotal = unitPrice * qty;
-                    return `
-                        <tr>
-                            <td style="padding: 5px 0; text-align: left; word-break: break-word;">${name}</td>
-                            <td style="text-align: center; padding: 5px 0;">${qty}</td>
-                            <td style="text-align: right; padding: 5px 0;">${lineTotal.toLocaleString()}</td>
-                        </tr>
-                    `;
-                }).join('');
-
-                let methodText = 'Espèces';
-                if (saleObj.payment_method === 'card') methodText = 'CB / Mobile Money';
-                if (saleObj.payment_method === 'credit') methodText = 'Crédit (Dette client)';
-                document.getElementById('receipt-method').textContent = methodText;
-
-                document.getElementById('receipt-total').textContent =
-                    `${totalAmount.toLocaleString()} FCFA`;
-                document.getElementById('receipt-received').textContent =
-                    `${amountReceived.toLocaleString()} FCFA`;
-                document.getElementById('receipt-change').textContent =
-                    `${changeAmount.toLocaleString()} FCFA`;
-
-                const qrcodeContainer = document.getElementById('receipt-qrcode');
-                qrcodeContainer.innerHTML = '';
-                if (typeof QRCode !== 'undefined') {
-                    try {
-                        new QRCode(qrcodeContainer, {
-                            text: reference,
-                            width: 80,
-                            height: 80,
-                            colorDark: "#000000",
-                            colorLight: "#ffffff",
-                            correctLevel: QRCode.CorrectLevel.H
-                        });
-                    } catch (qrErr) {
-                        console.error("Erreur génération QR Code:", qrErr);
-                    }
-                } else {
-                    console.warn("La librairie QRCode n'est pas chargée.");
-                }
-
-                const cashierName = document.querySelector('.cashier-name')?.textContent || 'Caisse';
-
-                setTimeout(() => {
-                    // Utilise la boîte de dialogue d'impression système (100% fiable, comme pour la partie Admin)
-                    window.print();
-                }, 150);
-            }
 
             // Détection réelle offline globale (Utilise checkActualConnection défini dans layouts/app)
             let isCurrentlyOnline = navigator.onLine;
@@ -826,7 +862,126 @@
                         saveCart();
                         updateCartUI();
                     }
+                })
+                .catch(error => {
+                    console.error("Erreur validation vente :", error);
+                    Swal.fire('Erreur !', error.message || 'Une erreur est survenue lors de la validation.', 'error');
                 });
+        }
+
+        // Fonction partagée pour populer le reçu (Ticket + A4)
+        function populateReceipt(saleObj) {
+            if (!saleObj) return;
+            const saleItems = saleObj.items || [];
+            const reference = saleObj.reference || 'INCONNUE';
+            const created_at = saleObj.created_at || new Date().toISOString();
+            const now = new Date(created_at);
+            
+            const totalAmount = parseFloat(saleObj.total_amount || saleObj.total || 0);
+            const amountReceived = parseFloat(saleObj.amount_received || saleObj.received || 0);
+            const changeAmount = parseFloat(saleObj.change_amount || saleObj.change || 0);
+            const cashierNameVal = (saleObj.user && saleObj.user.name) ? saleObj.user.name : (document.querySelector('.cashier-name')?.textContent || 'Caisse');
+            
+            let methodText = 'Espèces';
+            if (saleObj.payment_method === 'card') methodText = 'CB / Mobile Money';
+            if (saleObj.payment_method === 'credit') methodText = 'Crédit (Dette client)';
+
+            // --- 1. POPULATE TICKET (80mm) ---
+            document.getElementById('receipt-ref').textContent = `REF: #${reference}`;
+            document.getElementById('receipt-date').textContent = `Date: ${now.toLocaleString('fr-FR')}`;
+
+            const custEl = document.getElementById('receipt-customer');
+            if (saleObj.customer) {
+                custEl.textContent = `Client: ${saleObj.customer.name}`;
+                custEl.style.display = 'block';
+            } else {
+                custEl.style.display = 'none';
+            }
+
+            document.getElementById('receipt-cashier').textContent = `Caissier: ${cashierNameVal}`;
+
+            const receiptItems = document.getElementById('receipt-items');
+            receiptItems.innerHTML = saleItems.map(item => {
+                const name = (item.product ? item.product.name : (item.name || 'Produit')).toUpperCase();
+                const qty = parseFloat(item.quantity || item.qty || 0);
+                const unitPrice = parseFloat(item.unit_price || item.price || 0);
+                const lineTotal = unitPrice * qty;
+                return `
+                    <tr>
+                        <td style="padding: 5px 0; text-align: left; word-break: break-word;">${name}</td>
+                        <td style="text-align: center; padding: 5px 0;">${qty}</td>
+                        <td style="text-align: right; padding: 5px 0;">${lineTotal.toLocaleString()}</td>
+                    </tr>
+                `;
+            }).join('');
+
+            document.getElementById('receipt-method').textContent = methodText;
+            document.getElementById('receipt-total').textContent = `${totalAmount.toLocaleString()} FCFA`;
+            document.getElementById('receipt-received').textContent = `${amountReceived.toLocaleString()} FCFA`;
+            document.getElementById('receipt-change').textContent = `${changeAmount.toLocaleString()} FCFA`;
+
+            const qrcodeContainer = document.getElementById('receipt-qrcode');
+            qrcodeContainer.innerHTML = '';
+            if (typeof QRCode !== 'undefined') {
+                try {
+                    new QRCode(qrcodeContainer, {
+                        text: reference,
+                        width: 80,
+                        height: 80,
+                        colorDark: "#000000",
+                        colorLight: "#ffffff",
+                        correctLevel: QRCode.CorrectLevel.H
+                    });
+                } catch (qrErr) {
+                    console.error("Erreur génération QR Code:", qrErr);
+                }
+            }
+
+            // --- 2. POPULATE A4 INVOICE ---
+            document.getElementById('receipt-a4-ref').textContent = `#${reference}`;
+            document.getElementById('receipt-a4-date').textContent = now.toLocaleString('fr-FR');
+
+            const customerBox = document.getElementById('receipt-a4-customer-box');
+            if (saleObj.customer) {
+                let custDetails = `<strong>${saleObj.customer.name}</strong>`;
+                if (saleObj.customer.phone) custDetails += `<br>Tél : ${saleObj.customer.phone}`;
+                if (saleObj.customer.email) custDetails += `<br>Email : ${saleObj.customer.email}`;
+                if (saleObj.customer.address) custDetails += `<br>Adresse : ${saleObj.customer.address}`;
+                customerBox.innerHTML = custDetails;
+            } else {
+                customerBox.innerHTML = `<strong>Client de Passage (Anonyme)</strong>`;
+            }
+
+            document.getElementById('receipt-a4-cashier').textContent = cashierNameVal;
+            document.getElementById('receipt-a4-method').textContent = methodText;
+
+            const receiptA4Items = document.getElementById('receipt-a4-items');
+            receiptA4Items.innerHTML = saleItems.map(item => {
+                const name = (item.product ? item.product.name : (item.name || 'Produit'));
+                const qty = parseFloat(item.quantity || item.qty || 0);
+                const unitPrice = parseFloat(item.unit_price || item.price || 0);
+                const lineTotal = unitPrice * qty;
+                return `
+                    <tr style="border-bottom: 1px solid #f1f5f9;">
+                        <td style="padding: 12px 10px; font-size: 13px;"><strong>${name}</strong></td>
+                        <td style="text-align: center; padding: 12px 10px; font-size: 13px;">${unitPrice.toLocaleString()} FCFA</td>
+                        <td style="text-align: center; padding: 12px 10px; font-size: 13px;">${qty}</td>
+                        <td style="text-align: right; padding: 12px 10px; font-size: 13px; font-weight: 700;">${lineTotal.toLocaleString()} FCFA</td>
+                    </tr>
+                `;
+            }).join('');
+
+            document.getElementById('receipt-a4-total').textContent = `${totalAmount.toLocaleString()} FCFA`;
+            document.getElementById('receipt-a4-received').textContent = `${amountReceived.toLocaleString()} FCFA`;
+            document.getElementById('receipt-a4-change').textContent = `${changeAmount.toLocaleString()} FCFA`;
+        }
+
+        // Fonction auxiliaire pour formater le reçu et l'imprimer
+        function printLocalReceipt(saleObj) {
+            populateReceipt(saleObj);
+            setTimeout(() => {
+                window.print();
+            }, 150);
         }
 
         function viewSaleDetails(sale) {
@@ -874,13 +1029,19 @@
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        ${sale.items.map(item => `
-                                                                                <tr style="border-bottom: 1px dotted #eee;">
-                                                                                    <td style="padding: 8px 0;">${item.product.name}</td>
-                                                                                    <td style="padding: 8px 0; text-align: center;">${item.quantity}</td>
-                                                                                    <td style="padding: 8px 0; text-align: right;">${(item.unit_price * item.quantity).toLocaleString()} FCFA</td>
-                                                                                </tr>
-                                                                            `).join('')}
+                                        ${sale.items.map(item => {
+                                            const prodName = item.product ? item.product.name : (item.name || 'Produit supprimé');
+                                            const qty = item.quantity || item.qty || 0;
+                                            const unitPrice = item.unit_price || item.price || 0;
+                                            const lineTotal = unitPrice * qty;
+                                            return `
+                                                <tr style="border-bottom: 1px dotted #eee;">
+                                                    <td style="padding: 8px 0;">${prodName}</td>
+                                                    <td style="padding: 8px 0; text-align: center;">${qty}</td>
+                                                    <td style="padding: 8px 0; text-align: right;">${lineTotal.toLocaleString()} FCFA</td>
+                                                </tr>
+                                            `;
+                                        }).join('')}
                                     </tbody>
                                     <tfoot>
                                         <tr style="border-top: 2px solid #eee;">
@@ -964,76 +1125,8 @@
         }
 
         function reprintReceipt(sale) {
-            // Populate Receipt
-            if (!sale) return;
-            const saleItems = sale.items || [];
-            const reference = sale.reference || 'INCONNUE';
-            const created_at = sale.created_at || new Date().toISOString();
-            const now = new Date(created_at);
-
-            const totalAmount = parseFloat(sale.total_amount || sale.total || 0);
-            const amountReceived = parseFloat(sale.amount_received || sale.received || 0);
-            const changeAmount = parseFloat(sale.change_amount || sale.change || 0);
-
-            document.getElementById('receipt-ref').textContent = `REF: #${reference}`;
-            document.getElementById('receipt-date').textContent =
-                `Date: ${now.toLocaleString('fr-FR')}`;
-
-            const custEl = document.getElementById('receipt-customer');
-            if (sale.customer) {
-                custEl.textContent = `Client: ${sale.customer.name}`;
-                custEl.style.display = 'block';
-            } else {
-                custEl.style.display = 'none';
-            }
-
-            const receiptItems = document.getElementById('receipt-items');
-            receiptItems.innerHTML = saleItems.map(item => {
-                const name = (item.product ? item.product.name : (item.name || 'Produit')).toUpperCase();
-                const qty = parseFloat(item.quantity || item.qty || 0);
-                const unitPrice = parseFloat(item.unit_price || item.price || 0);
-                const lineTotal = unitPrice * qty;
-                return `
-                    <tr>
-                        <td style="padding: 5px 0; text-align: left; word-break: break-word;">${name}</td>
-                        <td style="text-align: center; padding: 5px 0;">${qty}</td>
-                        <td style="text-align: right; padding: 5px 0;">${lineTotal.toLocaleString()}</td>
-                    </tr>
-                `;
-            }).join('');
-
-            document.getElementById('receipt-total').textContent =
-                `${totalAmount.toLocaleString()} FCFA`;
-            document.getElementById('receipt-received').textContent =
-                `${amountReceived.toLocaleString()} FCFA`;
-            document.getElementById('receipt-change').textContent =
-                `${changeAmount.toLocaleString()} FCFA`;
-
-            // Generate QR Code
-            const qrcodeContainer = document.getElementById('receipt-qrcode');
-            qrcodeContainer.innerHTML = '';
-            if (typeof QRCode !== 'undefined') {
-                try {
-                    new QRCode(qrcodeContainer, {
-                        text: reference,
-                        width: 80,
-                        height: 80,
-                        colorDark: "#000000",
-                        colorLight: "#ffffff",
-                        correctLevel: QRCode.CorrectLevel.H
-                    });
-                } catch (qrErr) {
-                    console.error("Erreur génération QR Code:", qrErr);
-                }
-            } else {
-                console.warn("La librairie QRCode n'est pas chargée.");
-            }
-
-            const cashierName = document.querySelector('.cashier-name')?.textContent || 'Caisse';
-
-            // Print
+            populateReceipt(sale);
             setTimeout(() => {
-                // Utilise la boîte de dialogue d'impression système (100% fiable, comme pour la partie Admin)
                 window.print();
             }, 150);
         }

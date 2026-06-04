@@ -14,7 +14,7 @@
                 <i class="fa-solid fa-address-card" style="color: #6366f1;"></i> Profil Client : {{ $customer->name }}
             </h2>
             <p class="list-sub" style="font-size: 13px; color: var(--text-muted); margin: 3px 0 0 0;">Visualisez les
-                transactions de fidélité, encours de crédit et historique d'achats</p>
+                encours de crédit, historique de règlements et d'achats</p>
         </div>
         <div style="display: flex; gap: 10px;">
             <a href="{{ route('admin.customers.index') }}" class="btn"
@@ -94,50 +94,64 @@
                 <div class="card-body" style="padding: 22px;">
                     <h3
                         style="margin: 0 0 18px; font-size: 13.5px; font-weight: 800; color: #1e293b; border-bottom: 1px solid #f1f5f9; padding-bottom: 10px; text-transform: uppercase; letter-spacing: 0.02em;">
-                        <i class="fa-solid fa-piggy-bank" style="color: #6366f1;"></i> Status financier & Fidélité
+                        <i class="fa-solid fa-piggy-bank" style="color: #6366f1;"></i> Statut financier & Crédits
                     </h3>
 
                     <div style="display: flex; flex-direction: column; gap: 15px;">
-                        <!-- Fidélité (Points) -->
-                        <div
-                            style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 10px; padding: 15px; display: flex; justify-content: space-between; align-items: center;">
-                            <div>
-                                <span
-                                    style="font-size: 10px; color:#15803d; font-weight:800; text-transform:uppercase; letter-spacing: 0.04em; display:block;">Fidélisation</span>
-                                <span
-                                    style="font-size: 18px; font-weight: 800; color:#15803d; display: flex; align-items: center; gap: 4px; margin-top: 2px;">
-                                    ⭐ {{ $customer->loyalty_points }} <span
-                                        style="font-size: 13px; font-weight: 600;">pts</span>
-                                </span>
-                            </div>
-                            <button onclick="openAdjustPointsModal()" class="btn"
-                                style="padding: 6px 12px; font-size: 11px; font-weight: 700; border-radius: 6px; background: white; border: 1px solid #bbf7d0; color: #15803d; cursor: pointer; transition: all 0.2s;"
-                                onmouseover="this.style.background='#dcfce7';" onmouseout="this.style.background='white';">
-                                Ajuster
-                            </button>
-                        </div>
-
                         <!-- Crédits / Dettes -->
                         <div
-                            style="background: {{ $customer->debt_balance > 0 ? '#fdf2f2' : '#f8fafc' }}; border: 1px solid {{ $customer->debt_balance > 0 ? '#fecdd3' : '#e2e8f0' }}; border-radius: 10px; padding: 15px; display: flex; justify-content: space-between; align-items: center;">
-                            <div>
-                                <span
-                                    style="font-size: 10px; color: {{ $customer->debt_balance > 0 ? '#991b1b' : '#64748b' }}; font-weight:800; text-transform:uppercase; letter-spacing: 0.04em; display:block;">Dette
-                                    (Crédit actif)</span>
-                                <span
-                                    style="font-size: 18px; font-weight: 800; color: {{ $customer->debt_balance > 0 ? '#dc2626' : '#1e293b' }}; display: block; margin-top: 2px;">
-                                    {{ number_format($customer->debt_balance, 0, ',', ' ') }} <span
-                                        style="font-size: 12px; font-weight:600;">FCFA</span>
-                                </span>
+                            style="background: {{ $customer->debt_balance > 0 ? '#fdf2f2' : '#f8fafc' }}; border: 1px solid {{ $customer->debt_balance > 0 ? '#fecdd3' : '#e2e8f0' }}; border-radius: 10px; padding: 15px; display: flex; flex-direction: column; gap: 12px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                                <div>
+                                    <span
+                                        style="font-size: 10px; color: {{ $customer->debt_balance > 0 ? '#991b1b' : '#64748b' }}; font-weight:800; text-transform:uppercase; letter-spacing: 0.04em; display:block;">Dette
+                                        (Crédit actif)</span>
+                                    <span
+                                        style="font-size: 18px; font-weight: 800; color: {{ $customer->debt_balance > 0 ? '#dc2626' : '#1e293b' }}; display: block; margin-top: 2px;">
+                                        {{ number_format($customer->debt_balance, 0, ',', ' ') }} <span
+                                            style="font-size: 12px; font-weight:600;">FCFA</span>
+                                    </span>
+                                </div>
+                                <span style="font-size: 22px; color: {{ $customer->debt_balance > 0 ? '#dc2626' : '#64748b' }};"><i class="fa-solid fa-hand-holding-dollar"></i></span>
                             </div>
-                            @if ($customer->debt_balance > 0)
-                                <button onclick="openPayDebtModal()" class="btn"
-                                    style="padding: 6px 12px; font-size: 11px; font-weight: 700; border-radius: 6px; background: #dc2626; border: 1px solid #dc2626; color: white; cursor: pointer; transition: all 0.2s;"
-                                    onmouseover="this.style.background='#b91c1c';"
-                                    onmouseout="this.style.background='#dc2626';">
-                                    Encaisser
+                            
+                            <div style="border-top: 1px solid #e2e8f0; padding-top: 10px; display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                                <span style="font-size: 11px; font-weight: 700; color: var(--text-muted);">Autorisation de crédit :</span>
+                                @if ($customer->is_credit_blocked)
+                                    <span style="font-size: 11px; font-weight: 700; color: #dc2626; background: #fee2e2; padding: 2px 6px; border-radius: 4px; border: 1px solid #fecdd3; display: inline-flex; align-items: center; gap: 3px;"><i class="fa-solid fa-ban"></i> Bloqué</span>
+                                @else
+                                    <span style="font-size: 11px; font-weight: 700; color: #16a34a; background: #f0fdf4; padding: 2px 6px; border-radius: 4px; border: 1px solid #bbf7d0; display: inline-flex; align-items: center; gap: 3px;"><i class="fa-solid fa-circle-check"></i> Autorisé</span>
+                                @endif
+                            </div>
+                            
+                            <div style="display: flex; gap: 6px; margin-top: 15px; align-items: center; width: 100%;">
+                                <button onclick="openAdjustDebtModal()" class="btn"
+                                    style="flex: 1; padding: 8px 4px; font-size: 11px; font-weight: 700; border-radius: 6px; background: white; border: 1px solid #cbd5e1; color: #475569; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; justify-content: center; gap: 4px; height: 36px; white-space: nowrap;"
+                                    onmouseover="this.style.background='#f1f5f9';" onmouseout="this.style.background='white';">
+                                    <i class="fa-solid fa-sliders"></i> Ajuster
                                 </button>
-                            @endif
+                                @if ($customer->debt_balance > 0)
+                                    <button onclick="openPayDebtModal()" class="btn"
+                                        style="flex: 1; padding: 8px 4px; font-size: 11px; font-weight: 700; border-radius: 6px; background: #dc2626; border: 1px solid #dc2626; color: white; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; justify-content: center; gap: 4px; height: 36px; white-space: nowrap;"
+                                        onmouseover="this.style.background='#b91c1c';"
+                                        onmouseout="this.style.background='#dc2626';">
+                                        <i class="fa-solid fa-sack-dollar"></i> Encaisser
+                                    </button>
+                                @endif
+                                <form action="{{ route('admin.customers.toggle-credit-block', $customer->id) }}" method="POST" style="flex: 1; margin: 0; display: block;">
+                                    @csrf
+                                    <button type="submit" class="btn"
+                                        style="width: 100%; padding: 8px 4px; font-size: 11px; font-weight: 700; border-radius: 6px; background: {{ $customer->is_credit_blocked ? '#10b981' : '#ef4444' }}; border: 1px solid {{ $customer->is_credit_blocked ? '#10b981' : '#ef4444' }}; color: white; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; justify-content: center; gap: 4px; height: 36px; white-space: nowrap;"
+                                        onmouseover="this.style.background='{{ $customer->is_credit_blocked ? '#059669' : '#b91c1c' }}';"
+                                        onmouseout="this.style.background='{{ $customer->is_credit_blocked ? '#10b981' : '#ef4444' }}';">
+                                        @if ($customer->is_credit_blocked)
+                                            <i class="fa-solid fa-unlock"></i> Débloquer
+                                        @else
+                                            <i class="fa-solid fa-lock"></i> Bloquer
+                                        @endif
+                                    </button>
+                                </form>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -264,11 +278,11 @@
     </div>
 
     <!-- Formulaires cachés pour actions directes -->
-    <form id="adjust-points-form" action="{{ route('admin.customers.adjust-points', $customer->id) }}" method="POST"
+    <form id="adjust-debt-form" action="{{ route('admin.customers.adjust-debt', $customer->id) }}" method="POST"
         style="display:none;">
         @csrf
         <input type="hidden" name="operation" id="adjust-operation">
-        <input type="hidden" name="points" id="adjust-points-vals">
+        <input type="hidden" name="amount" id="adjust-amount-vals">
     </form>
 
     <form id="pay-debt-direct-form" action="{{ route('admin.customers.pay-debt', $customer->id) }}" method="POST"
@@ -279,48 +293,48 @@
 
     @push('scripts')
         <script>
-            function openAdjustPointsModal() {
+            function openAdjustDebtModal() {
                 Swal.fire({
-                    title: 'Ajuster les points de fidélité',
+                    title: 'Ajuster la dette / le crédit',
                     html: `
-                        <div style="text-align: left; font-family: 'Outfit', sans-serif;">
+                        <div style="text-align: left; font-family: 'Outfit', sans-serif; font-size: 14px;">
                             <div style="margin-bottom: 15px;">
                                 <label style="font-weight:600; display:block; margin-bottom:5px;">Opération</label>
                                 <select id="swal-adjust-operation" class="form-control" style="width:100%; padding:8px; border-radius:6px; border:1px solid var(--border);">
-                                    <option value="add">Ajouter des points (+)</option>
-                                    <option value="subtract">Retirer des points (-)</option>
+                                    <option value="add">Augmenter la dette (Accorder un crédit +)</option>
+                                    <option value="subtract">Diminuer la dette (Encaisser un remboursement -)</option>
                                 </select>
                             </div>
                             <div>
-                                <label style="font-weight:600; display:block; margin-bottom:5px;">Nombre de points</label>
-                                <input type="number" id="swal-adjust-points" class="form-control" style="width:100%; padding:8px; border-radius:6px; border:1px solid var(--border);" placeholder="Ex: 50" min="1" required>
+                                <label style="font-weight:600; display:block; margin-bottom:5px;">Montant (FCFA)</label>
+                                <input type="number" id="swal-adjust-amount" class="form-control" style="width:100%; padding:8px; border-radius:6px; border:1px solid var(--border);" placeholder="Ex: 5000" min="1" required>
                             </div>
                         </div>
                     `,
                     showCancelButton: true,
                     confirmButtonText: 'Valider',
                     cancelButtonText: 'Annuler',
-                    confirmButtonColor: '#eab308',
+                    confirmButtonColor: '#6366f1',
                     focusConfirm: false,
                     preConfirm: () => {
                         const operation = document.getElementById('swal-adjust-operation').value;
-                        const points = parseInt(document.getElementById('swal-adjust-points').value || 0);
+                        const amount = parseFloat(document.getElementById('swal-adjust-amount').value || 0);
 
-                        if (!points || points <= 0) {
-                            Swal.showValidationMessage('Veuillez saisir un nombre de points correct et positif !');
+                        if (!amount || amount <= 0) {
+                            Swal.showValidationMessage('Veuillez saisir un montant correct et positif !');
                             return false;
                         }
 
                         return {
                             operation,
-                            points
+                            amount
                         };
                     }
                 }).then((result) => {
                     if (result.isConfirmed) {
                         document.getElementById('adjust-operation').value = result.value.operation;
-                        document.getElementById('adjust-points-vals').value = result.value.points;
-                        document.getElementById('adjust-points-form').submit();
+                        document.getElementById('adjust-amount-vals').value = result.value.amount;
+                        document.getElementById('adjust-debt-form').submit();
                     }
                 });
             }

@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>@yield('title', 'Interface Caisse') — SuperMarché Pro</title>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap"
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap"
         rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
@@ -32,6 +32,11 @@
             margin: 0;
             padding: 0;
             box-sizing: border-box;
+        }
+
+        .swal2-input {
+            max-width: 90% !important;
+            box-sizing: border-box !important;
         }
 
         body {
@@ -641,29 +646,63 @@
                 overflow: visible !important;
             }
 
-            .topbar, .app-content, .swal2-container, .no-print {
+            .topbar,
+            .app-content,
+            .swal2-container,
+            .no-print {
                 display: none !important;
             }
 
-            #receipt-print {
-                display: block !important;
-                width: 80mm;
-                padding: 5mm;
-                background: white !important;
-                color: black !important;
-                font-family: Arial, Helvetica, sans-serif !important;
-                font-weight: normal !important;
-            }
+            @if (($storeSettings->invoice_format ?? 'ticket') === 'ticket')
+                @page {
+                    size: 80mm auto;
+                    margin: 0;
+                }
+                html, body {
+                    width: 80mm !important;
+                }
+                #receipt-print {
+                    display: block !important;
+                    width: 80mm;
+                    padding: 5mm;
+                    background: white !important;
+                    color: black !important;
+                    font-family: Arial, Helvetica, sans-serif !important;
+                    font-weight: normal !important;
+                }
+                #receipt-print-a4 {
+                    display: none !important;
+                }
+            @else
+                @page {
+                    size: A4;
+                    margin: 15mm;
+                }
+                html, body {
+                    width: auto !important;
+                }
+                #receipt-print-a4 {
+                    display: block !important;
+                    width: 100% !important;
+                    background: white !important;
+                    color: black !important;
+                    font-family: 'Inter', sans-serif !important;
+                }
+                #receipt-print {
+                    display: none !important;
+                }
+            @endif
         }
 
-        #receipt-print {
+        #receipt-print,
+        #receipt-print-a4 {
             display: none;
         }
     </style>
     @stack('styles')
 </head>
 
-<body>
+<body class="print-format-{{ $storeSettings->invoice_format ?? 'ticket' }}">
 
     <!-- Topbar -->
     @include('employee.layouts.navbar')

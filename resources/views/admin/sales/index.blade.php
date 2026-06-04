@@ -212,7 +212,7 @@
                                         <div style="display: flex; align-items: center; gap: 8px;">
                                             <div
                                                 style="width: 24px; height: 24px; background: #e0f2fe; color: #0284c7; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 10px;">
-                                                {{ strtoupper(substr($sale->user->name ?? '?', 0, 1)) }}
+                                                {{ strtoupper(substr($sale->user?->name ?? '?', 0, 1)) }}
                                             </div>
                                             <span
                                                 style="font-size: 13.5px; font-weight: 500; color: #334155;">{{ $sale->user ? $sale->user->name : 'N/A' }}</span>

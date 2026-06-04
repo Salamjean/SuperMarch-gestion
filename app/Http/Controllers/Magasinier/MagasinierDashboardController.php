@@ -12,12 +12,56 @@ class MagasinierDashboardController extends Controller
 {
     public function index()
     {
-        $products = Product::latest()->get();
+        $totalProductsCount = Product::count();
+        $estimatedStockValue = Product::selectRaw('SUM(stock * price) as total')->first()->total ?? 0;
+        
+        $lowStockCount = Product::whereColumn('stock', '<=', 'stock_threshold')->count();
         $lowStockProducts = Product::whereColumn('stock', '<=', 'stock_threshold')
             ->orderBy('stock')
+            ->take(5)
             ->get();
 
-        return view('magasinier.dashboard', compact('products', 'lowStockProducts'));
+        $outOfStockCount = Product::where('stock', 0)->count();
+        $categoriesCount = \App\Models\Category::count();
+        $suppliersCount = \App\Models\Supplier::count();
+        $pendingRequestsCount = RestockRequest::where('status', 'pending')->count();
+        
+        $recentRequests = RestockRequest::with(['product', 'user'])
+            ->latest()
+            ->take(5)
+            ->get();
+
+        $recentProducts = Product::latest()->take(5)->get();
+
+        $totalStock = Product::sum('stock');
+
+        $categoryStats = Product::select('category_name')
+            ->selectRaw('count(*) as product_count')
+            ->selectRaw('sum(stock) as total_stock')
+            ->groupBy('category_name')
+            ->orderByDesc('total_stock')
+            ->get();
+
+        $supplierStats = \App\Models\Supplier::withCount('products')
+            ->orderByDesc('products_count')
+            ->take(5)
+            ->get();
+
+        return view('magasinier.dashboard', compact(
+            'totalProductsCount',
+            'estimatedStockValue',
+            'lowStockCount',
+            'lowStockProducts',
+            'outOfStockCount',
+            'categoriesCount',
+            'suppliersCount',
+            'pendingRequestsCount',
+            'recentRequests',
+            'recentProducts',
+            'categoryStats',
+            'supplierStats',
+            'totalStock'
+        ));
     }
 
     public function restockRequestsIndex()
@@ -33,19 +77,29 @@ class MagasinierDashboardController extends Controller
     {
         $restockRequest = RestockRequest::findOrFail($id);
         $quantity = intval($request->input('quantity', 0));
+        $initialStock = 0;
 
         if ($quantity > 0) {
             $product = $restockRequest->product;
             if ($product) {
+                $initialStock = $product->stock;
                 $product->increment('stock', $quantity);
             }
         }
 
-        $restockRequest->update(['status' => 'completed']);
+        $restockRequest->update([
+            'status' => 'completed',
+            'initial_stock' => $initialStock,
+            'added_stock' => $quantity
+        ]);
 
         return response()->json([
             'success' => true,
-            'message' => 'La demande a été marquée comme traitée.' . ($quantity > 0 ? " Le stock de " . $product->name . " a été augmenté de {$quantity} unités." : '')
+            'initial_stock' => $initialStock,
+            'added_stock' => $quantity,
+            'new_stock' => isset($product) ? $product->stock : 0,
+            'threshold' => isset($product) ? $product->stock_threshold : null,
+            'message' => 'La demande a été marquée comme traitée.' . ($quantity > 0 ? " Le stock de " . ($product->name ?? '') . " a été augmenté de {$quantity} unités." : '')
         ]);
     }
 

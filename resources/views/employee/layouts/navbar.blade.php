@@ -1,7 +1,7 @@
 <header class="topbar">
     <div class="topbar-brand">
         <i><i class="fa-solid fa-cart-shopping"></i></i>
-        Supermarché <span>Pro</span>
+        {{ $storeSettings->store_name }}
     </div>
 
     <div class="topbar-center">

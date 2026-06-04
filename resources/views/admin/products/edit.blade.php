@@ -107,15 +107,11 @@
                     </div>
 
                     <div class="prd-field">
-                        <label for="stock">Stock <span>*</span></label>
-                        <div class="prd-input {{ $errors->has('stock') ? 'is-invalid' : '' }}">
-                            <i class="fa-solid fa-boxes-stacked"></i>
-                            <input type="number" id="stock" name="stock" min="0"
-                                value="{{ old('stock', $product->stock) }}" required>
+                        <label for="stock">Stock (Lecture seule)</label>
+                        <div class="prd-input" style="background: #f1f5f9; cursor: not-allowed;">
+                            <i class="fa-solid fa-boxes-stacked" style="color: #94a3b8;"></i>
+                            <input type="number" id="stock" value="{{ $product->stock }}" readonly style="cursor: not-allowed; color: #64748b;" title="Le stock ne peut être modifié que via l'interface de réapprovisionnement.">
                         </div>
-                        @error('stock')
-                            <p class="prd-error"><i class="fa-solid fa-circle-exclamation"></i> {{ $message }}</p>
-                        @enderror
                     </div>
 
                     <div class="prd-field">

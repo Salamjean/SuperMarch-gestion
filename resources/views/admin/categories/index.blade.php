@@ -60,6 +60,9 @@
                                     </td>
                                     <td class="td-muted" style="text-align:center;">{{ $cat->created_at->format('d/m/Y') }}</td>
                                     <td class="td-actions" style="justify-content:center;">
+                                        <a href="{{ route('admin.products.index', ['category' => $cat->name]) }}" class="btn-icon" title="Voir les produits">
+                                            <i class="fa-solid fa-box-open"></i>
+                                        </a>
                                         <a href="{{ route('admin.categories.edit', $cat) }}" class="btn-icon" title="Modifier">
                                             <i class="fa-solid fa-pen"></i>
                                         </a>

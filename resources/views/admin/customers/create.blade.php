@@ -80,27 +80,16 @@
 
                 <div
                     style="font-size: 13.5px; font-weight: 800; color: #004d99; margin-bottom: 15px; display:flex; align-items:center; gap:8px;">
-                    <i class="fa-solid fa-coins"></i> Initialisation des soldes (Optionnel)
+                    <i class="fa-solid fa-hand-holding-dollar"></i> Initialisation du solde de crédit (Optionnel)
                 </div>
 
-                <div class="form-grid-2" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-                    <div class="form-group">
-                        <label
-                            style="font-size:12px; font-weight:700; color:var(--text); display:block; margin-bottom:6px;">Points
-                            de fidélité de départ</label>
-                        <input type="number" name="loyalty_points" class="form-control"
-                            style="width:100%; padding:10px; border-radius:8px; border:1px solid var(--border); outline:none;"
-                            value="{{ old('loyalty_points', 0) }}" min="0">
-                    </div>
-
-                    <div class="form-group">
-                        <label
-                            style="font-size:12px; font-weight:700; color:var(--text); display:block; margin-bottom:6px;">Encours
-                            de Dette de départ (FCFA)</label>
-                        <input type="number" name="debt_balance" class="form-control"
-                            style="width:100%; padding:10px; border-radius:8px; border:1px solid var(--border); outline:none;"
-                            value="{{ old('debt_balance', 0.0) }}" min="0" step="0.01">
-                    </div>
+                <div class="form-group">
+                    <label
+                        style="font-size:12px; font-weight:700; color:var(--text); display:block; margin-bottom:6px;">Encours
+                        de Dette de départ (FCFA)</label>
+                    <input type="number" name="debt_balance" class="form-control"
+                        style="width:100%; padding:10px; border-radius:8px; border:1px solid var(--border); outline:none;"
+                        value="{{ old('debt_balance', 0.0) }}" min="0" step="0.01">
                 </div>
             </div>
 

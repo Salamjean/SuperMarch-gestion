@@ -13,6 +13,8 @@ class RestockRequest extends Model
         'product_id',
         'user_id',
         'status',
+        'initial_stock',
+        'added_stock',
     ];
 
     public function product()
@@ -22,6 +24,6 @@ class RestockRequest extends Model
 
     public function user()
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(User::class)->withTrashed();
     }
 }

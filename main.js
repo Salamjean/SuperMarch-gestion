@@ -70,6 +70,33 @@ function createWindow() {
 
     win.loadURL("https://fescads.com");
 
+    // 🌐 Gestion du mode hors connexion (évite l'écran blanc si pas d'internet au démarrage)
+    win.webContents.on(
+        "did-fail-load",
+        async (event, errorCode, errorDescription, validatedURL) => {
+            // Si le chargement de l'URL distante fescads.com échoue
+            if (validatedURL.startsWith("https://fescads.com")) {
+                console.log("Échec du chargement de fescads.com :", errorDescription);
+
+                // Tentative 1 : Secours sur le serveur local de dev si actif
+                try {
+                    const response = await fetch("http://127.0.0.1:8000", { method: "HEAD" });
+                    if (response.ok) {
+                        console.log("Serveur local détecté actif. Redirection vers http://127.0.0.1:8000");
+                        win.loadURL("http://127.0.0.1:8000");
+                        return;
+                    }
+                } catch (err) {
+                    // Le serveur local de dev ne tourne pas
+                }
+
+                // Tentative 2 : Chargement de la page locale magnifique de secours hors-ligne
+                console.log("Chargement de la page de secours hors ligne locale.");
+                win.loadFile(path.join(__dirname, "public", "offline.html"));
+            }
+        }
+    );
+
     // 🔥 Ouvre les liens externes dans le navigateur
     win.webContents.setWindowOpenHandler(({ url }) => {
         shell.openExternal(url);

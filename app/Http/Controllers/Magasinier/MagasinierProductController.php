@@ -14,10 +14,15 @@ use Illuminate\Support\Facades\Storage;
 
 class MagasinierProductController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $products = Product::with(['supplier', 'creator'])->latest()->get();
-        return view('magasinier.products.index', compact('products'));
+        $query = Product::with(['supplier', 'creator']);
+        if ($request->filled('category')) {
+            $query->where('category_name', $request->get('category'));
+        }
+        $products = $query->latest()->get();
+        $selectedCategory = $request->get('category');
+        return view('magasinier.products.index', compact('products', 'selectedCategory'));
     }
 
     public function create()
@@ -140,5 +145,66 @@ class MagasinierProductController extends Controller
 
         return redirect()->route('magasinier.products.index')
             ->with('success', 'Produit supprimé.');
+    }
+
+    public function thresholdIndex()
+    {
+        $products = Product::where(function ($query) {
+            $query->whereColumn('stock', '<=', 'stock_threshold')
+                  ->orWhereHas('restockRequests', function ($q) {
+                      $q->where('status', 'pending');
+                  });
+        })
+        ->with(['supplier', 'creator'])
+        ->latest()
+        ->get();
+        return view('magasinier.products.threshold', compact('products'));
+    }
+
+    public function restockGrid()
+    {
+        $products = Product::where('is_active', true)->orderBy('name')->get();
+        $categories = Category::where('is_active', true)->get();
+        return view('magasinier.products.restock-grid', compact('products', 'categories'));
+    }
+
+    public function restock(Request $request, Product $product)
+    {
+        $request->validate([
+            'quantity' => ['required', 'integer', 'min:1']
+        ]);
+
+        $initialStock = $product->stock;
+        $addedStock = intval($request->quantity);
+
+        $product->increment('stock', $addedStock);
+
+        // Résoudre la requête en attente s'il y en a une, sinon créer une nouvelle entrée complétée
+        $pendingRequest = \App\Models\RestockRequest::where('product_id', $product->id)
+            ->where('status', 'pending')
+            ->first();
+
+        if ($pendingRequest) {
+            $pendingRequest->update([
+                'status' => 'completed',
+                'initial_stock' => $initialStock,
+                'added_stock' => $addedStock
+            ]);
+        } else {
+            \App\Models\RestockRequest::create([
+                'product_id' => $product->id,
+                'user_id' => auth()->id(),
+                'status' => 'completed',
+                'initial_stock' => $initialStock,
+                'added_stock' => $addedStock
+            ]);
+        }
+
+        return response()->json([
+            'success' => true,
+            'new_stock' => $product->stock,
+            'threshold' => $product->stock_threshold,
+            'message' => "Le stock de {$product->name} a été réapprovisionné de {$request->quantity} unités. Nouveau stock : {$product->stock}."
+        ]);
     }
 }

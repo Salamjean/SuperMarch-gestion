@@ -81,34 +81,20 @@
 
                 <div
                     style="font-size: 13.5px; font-weight: 800; color: #004d99; margin-bottom: 15px; display:flex; align-items:center; gap:8px;">
-                    <i class="fa-solid fa-coins"></i> Paramètres financiers & fidélité
+                    <i class="fa-solid fa-hand-holding-dollar"></i> Paramètres financiers & Crédit
                 </div>
 
-                <div class="form-grid-2" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-                    <div class="form-group">
-                        <label
-                            style="font-size:12px; font-weight:700; color:var(--text); display:block; margin-bottom:6px;">Points
-                            de fidélité <span style="color:var(--danger)">*</span></label>
-                        <input type="number" name="loyalty_points" class="form-control"
-                            style="width:100%; padding:10px; border-radius:8px; border:1px solid var(--border); outline:none;"
-                            value="{{ old('loyalty_points', $customer->loyalty_points) }}" min="0" required>
-                        @error('loyalty_points')
-                            <p style="color:var(--danger); font-size:11px; margin-top:4px;">{{ $message }}</p>
-                        @enderror
-                    </div>
-
-                    <div class="form-group">
-                        <label
-                            style="font-size:12px; font-weight:700; color:var(--text); display:block; margin-bottom:6px;">Encours
-                            de Dette (FCFA) <span style="color:var(--danger)">*</span></label>
-                        <input type="number" name="debt_balance" class="form-control"
-                            style="width:100%; padding:10px; border-radius:8px; border:1px solid var(--border); outline:none;"
-                            value="{{ old('debt_balance', $customer->debt_balance) }}" min="0" step="0.01"
-                            required>
-                        @error('debt_balance')
-                            <p style="color:var(--danger); font-size:11px; margin-top:4px;">{{ $message }}</p>
-                        @enderror
-                    </div>
+                <div class="form-group">
+                    <label
+                        style="font-size:12px; font-weight:700; color:var(--text); display:block; margin-bottom:6px;">Encours
+                        de Dette (FCFA) <span style="color:var(--danger)">*</span></label>
+                    <input type="number" name="debt_balance" class="form-control"
+                        style="width:100%; padding:10px; border-radius:8px; border:1px solid var(--border); outline:none;"
+                        value="{{ old('debt_balance', $customer->debt_balance) }}" min="0" step="0.01"
+                        required>
+                    @error('debt_balance')
+                        <p style="color:var(--danger); font-size:11px; margin-top:4px;">{{ $message }}</p>
+                    @enderror
                 </div>
             </div>
 

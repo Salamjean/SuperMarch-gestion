@@ -30,7 +30,10 @@ Route::prefix('admin')->name('admin.')->middleware('admin')->group(function () {
 
     Route::resource('categories', CategoryController::class);
     Route::resource('suppliers',  SupplierController::class);
+    Route::get('/products/threshold', [ProductController::class, 'thresholdIndex'])->name('products.threshold');
+    Route::post('/products/{product}/restock', [ProductController::class, 'restock'])->name('products.restock');
     Route::get('/products/check-barcode', [ProductController::class, 'checkBarcode'])->name('products.check-barcode');
+    Route::get('/products/restock-grid', [ProductController::class, 'restockGrid'])->name('products.restock-grid');
     Route::resource('products',   ProductController::class);
     Route::get('/restock-requests', [AdminDashboardController::class, 'restockRequestsIndex'])->name('restock-requests.index');
     Route::post('/stock/request/{id}/resolve', [AdminDashboardController::class, 'resolveRestock'])->name('stock.resolve');
@@ -44,11 +47,20 @@ Route::prefix('admin')->name('admin.')->middleware('admin')->group(function () {
     // 2. Sessions de Caisse
     Route::get('/cash-sessions', [App\Http\Controllers\Admin\AdminCashSessionController::class, 'index'])->name('cash-sessions.index');
     Route::get('/cash-sessions/{id}', [App\Http\Controllers\Admin\AdminCashSessionController::class, 'show'])->name('cash-sessions.show');
-
-    // 3. Gestion Clientèle (Fidélité & Crédits)
+    // 3. Gestion Clientèle (Crédits & Dettes)
     Route::resource('customers', App\Http\Controllers\Admin\AdminCustomerController::class);
-    Route::post('/customers/{id}/adjust-points', [App\Http\Controllers\Admin\AdminCustomerController::class, 'adjustPoints'])->name('customers.adjust-points');
+    Route::post('/customers/{id}/adjust-debt', [App\Http\Controllers\Admin\AdminCustomerController::class, 'adjustDebt'])->name('customers.adjust-debt');
     Route::post('/customers/{id}/pay-debt', [App\Http\Controllers\Admin\AdminCustomerController::class, 'payDebt'])->name('customers.pay-debt');
+    Route::post('/customers/{id}/toggle-credit-block', [App\Http\Controllers\Admin\AdminCustomerController::class, 'toggleCreditBlock'])->name('customers.toggle-credit-block');
+    Route::get('/debt-payments', [App\Http\Controllers\Admin\AdminCustomerController::class, 'debtPaymentsIndex'])->name('debt-payments.index');
+
+    // Paramètres Boutique
+    Route::get('/settings', [App\Http\Controllers\Admin\SettingController::class, 'edit'])->name('settings.edit');
+    Route::post('/settings', [App\Http\Controllers\Admin\SettingController::class, 'update'])->name('settings.update');
+
+    // Gestion Profil
+    Route::get('/profile', [AdminDashboardController::class, 'showProfile'])->name('profile.show');
+    Route::post('/profile/update', [AdminDashboardController::class, 'updateProfile'])->name('profile.update');
 });
 
 // Employee protected routes
@@ -65,6 +77,7 @@ Route::prefix('employee')->name('employee.')->middleware('employee')->group(func
     // Gestion Clientèle
     Route::get('/customers/search', [EmployeeDashboardController::class, 'searchCustomers'])->name('customers.search');
     Route::post('/customers', [EmployeeDashboardController::class, 'storeCustomer'])->name('customers.store');
+    Route::post('/customers/{id}/pay-debt', [EmployeeDashboardController::class, 'payCustomerDebt'])->name('customers.pay-debt');
 
     // Annulations & Retours
     Route::post('/pos/sales/{id}/refund', [EmployeeDashboardController::class, 'refundSale'])->name('pos.sales.refund');
@@ -80,6 +93,9 @@ Route::prefix('magasinier')->name('magasinier.')->middleware('magasinier')->grou
 
     // Produits
     Route::get('/products/check-barcode', [MagasinierProductController::class, 'checkBarcode'])->name('products.check-barcode');
+    Route::get('/products/threshold', [MagasinierProductController::class, 'thresholdIndex'])->name('products.threshold');
+    Route::get('/products/restock-grid', [MagasinierProductController::class, 'restockGrid'])->name('products.restock-grid');
+    Route::post('/products/{product}/restock', [MagasinierProductController::class, 'restock'])->name('products.restock');
     Route::resource('products', MagasinierProductController::class);
 
     // Fournisseurs

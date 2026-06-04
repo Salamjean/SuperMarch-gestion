@@ -4,9 +4,10 @@
 @section('page-title', 'Nouveau produit')
 
 @section('content')
+<div style="position: relative; min-height: calc(100vh - 120px); width: 100%;">
     <!-- Scanner enrollment overlay -->
     <div id="enrollment-overlay"
-        style="position:fixed; top:70px; left:260px; right:0; bottom:0; background:rgba(255,255,255,0.9); z-index:998; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#333; text-align:center; backdrop-filter:blur(8px); border-top-left-radius:24px;">
+        style="position:absolute; top:0; left:0; right:0; bottom:0; background:rgba(255,255,255,0.95); z-index:998; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#333; text-align:center; backdrop-filter:blur(8px); border-radius:20px;">
 
         <!-- Bouton en haut à droite de l'overlay -->
         <button type="button" onclick="skipScanner()"
@@ -241,6 +242,7 @@
             </article>
         </form>
     </div>
+</div>
 @endsection
 
 @push('styles')

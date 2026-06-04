@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SuperMarche - Mode Hors Connexion</title>
+    <style>
+        /* --- DESIGN SYSTEM & POLICES --- */
+        :root {
+            --bg-start: #0b0f19;
+            --bg-end: #171232;
+            --card-bg: rgba(30, 41, 59, 0.45);
+            --card-border: rgba(255, 255, 255, 0.08);
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --primary: #6366f1;
+            --primary-glow: rgba(99, 102, 241, 0.3);
+            --danger: #ef4444;
+            --danger-glow: rgba(239, 68, 68, 0.25);
+            --success: #10b981;
+            --success-glow: rgba(16, 185, 129, 0.25);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: linear-gradient(135deg, var(--bg-start) 0%, var(--bg-end) 100%);
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow-x: hidden;
+            padding: 20px;
+        }
+
+        /* --- GLASSMORPHISM CONTAINER --- */
+        .container {
+            width: 100%;
+            max-width: 600px;
+            background: var(--card-bg);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--card-border);
+            border-radius: 28px;
+            padding: 40px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5),
+                        inset 0 1px 0 rgba(255, 255, 255, 0.1);
+            text-align: center;
+            animation: fadeIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        /* --- GLOWING OFFLINE ICON --- */
+        .icon-wrapper {
+            position: relative;
+            width: 96px;
+            height: 96px;
+            background: rgba(239, 68, 68, 0.1);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 24px;
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            box-shadow: 0 0 30px var(--danger-glow);
+        }
+
+        .icon-wrapper::after {
+            content: '';
+            position: absolute;
+            top: -5px;
+            left: -5px;
+            right: -5px;
+            bottom: -5px;
+            border-radius: 50%;
+            border: 1px solid var(--danger);
+            opacity: 0.4;
+            animation: pulseGlow 2.5s infinite ease-in-out;
+        }
+
+        .icon-wrapper svg {
+            width: 48px;
+            height: 48px;
+            fill: var(--danger);
+        }
+
+        /* --- TYPOGRAPHIE --- */
+        h1 {
+            font-size: 28px;
+            font-weight: 800;
+            letter-spacing: -0.025em;
+            margin-bottom: 8px;
+            background: linear-gradient(to right, #ffffff, #c7d2fe);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .subtitle {
+            font-size: 15px;
+            color: var(--text-secondary);
+            margin-bottom: 30px;
+            line-height: 1.6;
+        }
+
+        /* --- STATUS BADGES --- */
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(239, 68, 68, 0.15);
+            color: #fca5a5;
+            padding: 8px 16px;
+            border-radius: 9999px;
+            font-size: 13px;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            margin-bottom: 32px;
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.1);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background-color: var(--danger);
+            border-radius: 50%;
+            animation: statusDotPulse 1.5s infinite ease-in-out;
+        }
+
+        /* --- SQLITE OFFLINE SALES CARD --- */
+        .sqlite-card {
+            background: rgba(15, 23, 42, 0.4);
+            border: 1px solid var(--card-border);
+            border-radius: 20px;
+            padding: 20px;
+            margin-bottom: 30px;
+            text-align: left;
+            transition: all 0.3s ease;
+        }
+
+        .sqlite-card:hover {
+            border-color: rgba(255, 255, 255, 0.15);
+            transform: translateY(-2px);
+        }
+
+        .sqlite-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 15px;
+            border-bottom: 1px dashed var(--card-border);
+            padding-bottom: 10px;
+        }
+
+        .sqlite-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .sqlite-title svg {
+            width: 18px;
+            height: 18px;
+            fill: var(--primary);
+        }
+
+        .sqlite-badge {
+            background: var(--primary-glow);
+            color: #c7d2fe;
+            font-size: 12px;
+            font-weight: 700;
+            padding: 4px 10px;
+            border-radius: 8px;
+            border: 1px solid rgba(99, 102, 241, 0.3);
+        }
+
+        .sqlite-list {
+            max-height: 150px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            padding-right: 5px;
+        }
+
+        .sqlite-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: rgba(30, 41, 59, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.03);
+            padding: 10px 14px;
+            border-radius: 12px;
+            font-size: 13px;
+            animation: slideIn 0.4s ease forwards;
+        }
+
+        .sqlite-item-ref {
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .sqlite-item-date {
+            color: var(--text-secondary);
+            font-size: 11px;
+            margin-top: 2px;
+        }
+
+        .sqlite-item-amount {
+            font-weight: 800;
+            color: var(--success);
+        }
+
+        .empty-sqlite {
+            text-align: center;
+            color: var(--text-secondary);
+            font-size: 13px;
+            padding: 15px 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .empty-sqlite svg {
+            width: 24px;
+            height: 24px;
+            fill: var(--text-secondary);
+            opacity: 0.4;
+        }
+
+        /* --- BUTTONS --- */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            width: 100%;
+            background: var(--primary);
+            color: #ffffff;
+            border: none;
+            padding: 16px 30px;
+            border-radius: 16px;
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
+            box-shadow: 0 10px 20px -5px var(--primary-glow);
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 15px 25px -5px var(--primary-glow);
+            background: #4f46e5;
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn svg {
+            width: 18px;
+            height: 18px;
+            fill: currentColor;
+            transition: transform 0.6s ease;
+        }
+
+        .btn:hover svg {
+            transform: rotate(180deg);
+        }
+
+        /* --- LOADER BANNER (AUTO-SYNC) --- */
+        .loader-banner {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            margin-top: 24px;
+            color: var(--text-secondary);
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        .spinner {
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            border-top: 2px solid var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        /* --- SCROLLBAR --- */
+        ::-webkit-scrollbar {
+            width: 4px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        /* --- ANIMATIONS --- */
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes pulseGlow {
+            0%, 100% {
+                transform: scale(1);
+                opacity: 0.4;
+            }
+            50% {
+                transform: scale(1.15);
+                opacity: 0.1;
+            }
+        }
+
+        @keyframes statusDotPulse {
+            0%, 100% {
+                transform: scale(1);
+                opacity: 1;
+                box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+            }
+            50% {
+                transform: scale(1.2);
+                opacity: 0.5;
+                box-shadow: 0 0 10px 4px rgba(239, 68, 68, 0);
+            }
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <!-- Icône d'alerte réseau déconnecté -->
+        <div class="icon-wrapper">
+            <svg viewBox="0 0 24 24">
+                <path d="M23.64 5.37C23.16 5 18.96 1.5 12 1.5c-6.96 0-11.16 3.5-11.64 3.87a.885.885 0 0 0-.08 1.35l10.87 13.56c.4.5 1.15.5 1.55 0l10.87-13.56a.885.885 0 0 0-.08-1.35zM12 18.5L2.3 6.4C3.86 5.17 7.4 3.5 12 3.5s8.14 1.67 9.7 2.9L12 18.5zm5.9-9.1l-2.1-2.1c-.8.8-1.7 1.4-2.8 1.7v3.1c1.8-.4 3.4-1.3 4.9-2.7zm-7.9 4.8V11c-1.1-.3-2-.9-2.8-1.7l-2.1 2.1c1.5 1.4 3.1 2.3 4.9 2.7zm2-6.7c.6 0 1-.4 1-1V5.5c0-.6-.4-1-1-1s-1 .4-1 1V6.5c0 .6.4 1 1 1zm-1.5 8c0-.6-.4-1-1-1H8c-.6 0-1 .4-1 1s.4 1 1 1h1.5c.6 0 1-.4 1-1z"/>
+            </svg>
+        </div>
+
+        <h1>Connexion Internet Perdue</h1>
+        
+        <p class="subtitle">
+            L'application de caisse n'a pas pu joindre la base de données distante. Vérifiez l'état de votre modem ou de votre connexion Wi-Fi.
+        </p>
+
+        <!-- Badge de statut -->
+        <div class="status-badge" id="network-badge">
+            <span class="status-dot"></span>
+            <span id="network-text">Mode Hors Connexion</span>
+        </div>
+
+        <!-- Section des ventes en attente SQLite -->
+        <div class="sqlite-card">
+            <div class="sqlite-header">
+                <span class="sqlite-title">
+                    <!-- Icône base de données SQLite -->
+                    <svg viewBox="0 0 24 24">
+                        <path d="M12 2C6.48 2 2 4.02 2 6.5v11c0 2.48 4.48 4.5 10 4.5s10-2.02 10-4.5v-11C22 4.02 17.52 2 12 2zm0 18c-4.42 0-8-1.57-8-3.5V14.6c1.9 1.13 4.8 1.9 8 1.9s6.1-0.77 8-1.9v1.9c0 1.93-3.58 3.5-8 3.5zm0-4.5c-4.42 0-8-1.57-8-3.5V10.1c1.9 1.13 4.8 1.9 8 1.9s6.1-0.77 8-1.9v1.9c0 1.93-3.58 3.5-8 3.5zm0-4.5c-4.42 0-8-1.57-8-3.5V6.5c0 1.93 3.58 3.5 8 3.5s8-1.57 8-3.5V8.6c0 1.93-3.58 3.5-8 3.5zM4 6.5C4 4.57 7.58 3 12 3s8 1.57 8 3.5S16.42 10 12 10 4 8.43 4 6.5z"/>
+                    </svg>
+                    Sauvegardes Locales (PC)
+                </span>
+                <span class="sqlite-badge" id="sales-count">0 vente</span>
+            </div>
+            
+            <div class="sqlite-list" id="sales-list">
+                <!-- Les ventes SQLite seront chargées ici dynamiquement -->
+                <div class="empty-sqlite">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                    </svg>
+                    <span>Aucune vente en attente de synchronisation.</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bouton de reconnexion manuelle -->
+        <button class="btn" onclick="retryConnection()">
+            <!-- Icône Refresh -->
+            <svg viewBox="0 0 24 24">
+                <path d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+            </svg>
+            Réessayer de se connecter
+        </button>
+
+        <!-- Loader auto-reconnexion -->
+        <div class="loader-banner">
+            <div class="spinner"></div>
+            <span>Vérification automatique de la connexion...</span>
+        </div>
+    </div>
+
+    <script>
+        // Fonction principale pour tenter la reconnexion
+        function retryConnection() {
+            // Affiche un indicateur de chargement immédiat sur le bouton
+            const btn = document.querySelector('.btn');
+            btn.innerHTML = '<div class="spinner" style="border-top-color: white;"></div> Tentative de reconnexion...';
+            btn.disabled = true;
+
+            setTimeout(() => {
+                window.location.href = "https://fescads.com";
+            }, 500);
+        }
+
+        // Chargement des ventes SQLite locales
+        async function loadLocalSales() {
+            try {
+                if (window.electronAPI && typeof window.electronAPI.getOfflineSales === 'function') {
+                    const sales = await window.electronAPI.getOfflineSales();
+                    const count = Array.isArray(sales) ? sales.length : 0;
+                    
+                    // Mise à jour du badge de quantité
+                    document.getElementById('sales-count').textContent = `${count} vente${count > 1 ? 's' : ''}`;
+                    
+                    const listContainer = document.getElementById('sales-list');
+                    if (count > 0) {
+                        listContainer.innerHTML = sales.map((sale, index) => {
+                            const dateStr = sale.created_at ? new Date(sale.created_at).toLocaleString('fr-FR') : 'Date inconnue';
+                            const totalAmount = sale.total_amount ? parseInt(sale.total_amount).toLocaleString() : '0';
+                            const ref = sale.reference || `VENTE #${index + 1}`;
+                            return `
+                                <div class="sqlite-item" style="animation-delay: ${index * 0.05}s">
+                                    <div>
+                                        <div class="sqlite-item-ref">${ref}</div>
+                                        <div class="sqlite-item-date">${dateStr}</div>
+                                    </div>
+                                    <div class="sqlite-item-amount">${totalAmount} FCFA</div>
+                                </div>
+                            `;
+                        }).join('');
+                    }
+                }
+            } catch (err) {
+                console.error("Impossible de charger les ventes SQLite locales :", err);
+            }
+        }
+
+        // Détection de la reconnexion automatique en temps réel
+        window.addEventListener('online', () => {
+            const badge = document.getElementById('network-badge');
+            const badgeText = document.getElementById('network-text');
+            const dot = badge.querySelector('.status-dot');
+
+            badge.style.background = 'rgba(16, 185, 129, 0.15)';
+            badge.style.color = '#a7f3d0';
+            badge.style.borderColor = 'rgba(16, 185, 129, 0.2)';
+            dot.style.backgroundColor = 'var(--success)';
+            dot.style.animation = 'statusDotPulse 1s infinite ease-in-out';
+            badgeText.textContent = "Internet rétabli ! Reconnexion...";
+
+            // Redirection après un petit délai de 1.5s pour donner une sensation fluide
+            setTimeout(() => {
+                window.location.href = "https://fescads.com";
+            }, 1500);
+        });
+
+        // Lancement au chargement du DOM
+        document.addEventListener('DOMContentLoaded', () => {
+            loadLocalSales();
+            
+            // Vérification périodique pour rafraîchir la liste des ventes (au cas où elle change)
+            setInterval(loadLocalSales, 5000);
+        });
+    </script>
+</body>
+</html>

@@ -17,13 +17,20 @@
             box-sizing: border-box;
         }
 
+        .swal2-input {
+            max-width: 90% !important;
+            box-sizing: border-box !important;
+        }
+
         :root {
             --blue: #004d99;
             --blue-dark: #003d7a;
             --blue-light: #e8f1fb;
             --yellow: #ffc300;
             --yellow-dark: #e6b000;
-            --sidebar-w: 240px;
+            --primary: #004d99;
+            --primary-light: #1a6bbf;
+            --sidebar-w: 270px;
             --navbar-h: 58px;
             --text: #1a2840;
             --text-muted: #7a94aa;
@@ -111,48 +118,66 @@
         /* Nav */
         .sidebar-nav {
             flex: 1;
-            padding: 0 10px;
+            padding: 0 12px 25px;
             overflow-y: auto;
         }
 
         .sidebar-section-label {
             font-size: 10px;
-            font-weight: 700;
+            font-weight: 800;
             letter-spacing: .08em;
             text-transform: uppercase;
             color: rgba(255, 255, 255, .4);
-            padding: 4px 8px 8px;
+            padding: 18px 16px 6px;
         }
 
         .sidebar-link {
             display: flex;
             align-items: center;
-            gap: 10px;
-            padding: 10px 12px;
-            border-radius: 10px;
+            gap: 12px;
+            padding: 11px 16px;
+            border-radius: 12px;
             text-decoration: none;
-            color: rgba(255, 255, 255, .75);
+            color: rgba(255, 255, 255, .8);
             font-size: 13.5px;
             font-weight: 500;
-            margin-bottom: 2px;
-            transition: background .2s ease, color .2s ease;
+            margin-bottom: 4px;
+            transition: all .25s cubic-bezier(0.4, 0, 0.2, 1);
+            border-left: 3px solid transparent;
         }
 
         .sidebar-link i {
-            width: 18px;
-            text-align: center;
-            font-size: 14px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 28px;
+            height: 28px;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.07);
+            font-size: 13px;
+            transition: all .25s ease;
+            flex-shrink: 0;
         }
 
         .sidebar-link:hover {
-            background: rgba(255, 255, 255, .1);
+            background: rgba(255, 255, 255, .08);
             color: #ffffff;
+            padding-left: 19px;
+            border-left-color: rgba(255, 255, 255, 0.3);
+        }
+
+        .sidebar-link:hover i {
+            background: rgba(255, 255, 255, 0.15);
+            transform: scale(1.05);
         }
 
         .sidebar-link.active {
             background: var(--yellow);
             color: var(--blue-dark);
             font-weight: 700;
+            padding-left: 19px;
+            border-left-color: var(--yellow-dark);
+            box-shadow: 0 4px 15px rgba(255, 195, 0, 0.2);
         }
 
         .sidebar-link.active i {
@@ -498,8 +523,11 @@
         /* ══════════════════════════════
            SIDEBAR DROPDOWN
         ══════════════════════════════ */
+        /* ══════════════════════════════
+           SIDEBAR DROPDOWN
+         ══════════════════════════════ */
         .sidebar-dropdown {
-            margin-bottom: 2px;
+            margin-bottom: 4px;
         }
 
         .sidebar-dropdown-toggle {
@@ -507,47 +535,77 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 10px 12px;
-            border-radius: 10px;
+            padding: 11px 16px;
+            border-radius: 12px;
             background: transparent;
             border: none;
-            color: rgba(255, 255, 255, .75);
+            color: rgba(255, 255, 255, 0.8);
             font-family: inherit;
             font-size: 13.5px;
             font-weight: 500;
             cursor: pointer;
-            transition: background .2s, color .2s;
+            transition: all .25s cubic-bezier(0.4, 0, 0.2, 1);
+            border-left: 3px solid transparent;
         }
 
         .sidebar-dropdown-toggle:hover {
-            background: rgba(255, 255, 255, .1);
+            background: rgba(255, 255, 255, 0.08);
             color: #ffffff;
+            padding-left: 19px;
+            border-left-color: rgba(255, 255, 255, 0.3);
+        }
+
+        .sidebar-dropdown-toggle:hover .sidebar-dropdown-left i {
+            background: rgba(255, 255, 255, 0.15);
+            transform: scale(1.05);
         }
 
         .sidebar-dropdown.open .sidebar-dropdown-toggle {
-            background: rgba(255, 255, 255, .08);
+            background: rgba(255, 255, 255, 0.06);
             color: #ffffff;
+            border-left-color: rgba(255, 255, 255, 0.2);
         }
 
         .sidebar-dropdown-left {
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 12px;
         }
 
         .sidebar-dropdown-left i {
-            width: 18px;
-            text-align: center;
-            font-size: 14px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 28px;
+            height: 28px;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.07);
+            font-size: 13px;
+            transition: all .25s ease;
+            flex-shrink: 0;
         }
 
         .sidebar-chevron {
             font-size: 11px;
             transition: transform .25s ease;
+            color: rgba(255, 255, 255, 0.5);
+            margin-right: 2px;
         }
 
         .sidebar-dropdown.open .sidebar-chevron {
             transform: rotate(90deg);
+            color: #ffffff;
+        }
+
+        @keyframes dropdownSlide {
+            from {
+                opacity: 0;
+                transform: translateY(-6px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
 
         .sidebar-dropdown-menu {
@@ -558,33 +616,40 @@
 
         .sidebar-dropdown.open .sidebar-dropdown-menu {
             display: flex;
+            animation: dropdownSlide 0.2s ease forwards;
         }
 
         .sidebar-sub-link {
             display: flex;
             align-items: center;
-            gap: 8px;
-            padding: 8px 12px;
+            gap: 10px;
+            padding: 9px 14px;
             border-radius: 8px;
             text-decoration: none;
-            color: rgba(255, 255, 255, .65);
+            color: rgba(255, 255, 255, .68);
             font-size: 13px;
             font-weight: 500;
-            transition: background .2s, color .2s;
-            border-left: 2px solid rgba(255, 255, 255, .1);
-            margin-bottom: 1px;
+            transition: all .2s ease;
+            border-left: 2px solid rgba(255, 255, 255, 0.15);
+            margin-bottom: 2px;
+            margin-left: 14px;
         }
 
         .sidebar-sub-link i {
-            width: 14px;
-            text-align: center;
-            font-size: 12px;
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.5);
+            transition: all .2s ease;
         }
 
         .sidebar-sub-link:hover {
-            background: rgba(255, 255, 255, .08);
+            background: rgba(255, 255, 255, .05);
             color: #ffffff;
-            border-left-color: rgba(255, 255, 255, .35);
+            border-left-color: var(--yellow);
+            padding-left: 17px;
+        }
+
+        .sidebar-sub-link:hover i {
+            color: #ffffff;
         }
 
         .sidebar-sub-link.active {
@@ -592,38 +657,8 @@
             color: var(--blue-dark);
             font-weight: 700;
             border-left-color: var(--yellow-dark);
-
-            /* Direct navigation link (not dropdown) */
-            .sidebar-link {
-                display: flex;
-                align-items: center;
-                gap: 10px;
-                padding: 10px 12px;
-                border-radius: 10px;
-                text-decoration: none;
-                color: rgba(255, 255, 255, .75);
-                font-size: 13.5px;
-                font-weight: 500;
-                transition: background .2s, color .2s;
-                margin-bottom: 2px;
-            }
-
-            .sidebar-link i {
-                width: 16px;
-                text-align: center;
-                font-size: 13px;
-            }
-
-            .sidebar-link:hover {
-                background: rgba(255, 255, 255, .1);
-                color: #ffffff;
-            }
-
-            .sidebar-link.active {
-                background: var(--yellow);
-                color: var(--blue-dark);
-                font-weight: 700;
-            }
+            padding-left: 17px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
         }
 
         @stack('styles')

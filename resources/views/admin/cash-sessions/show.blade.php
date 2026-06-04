@@ -170,12 +170,18 @@
                             <td style="padding: 12px 0; font-size: 14px; font-weight: 800; color: #db2777; text-align: right;">
                                 -{{ number_format($totalRefundsAmount, 0, ',', ' ') }} FCFA</td>
                         </tr>
+                        <tr style="border-bottom: 1px dashed #f1f5f9;">
+                            <td style="padding: 12px 0; font-size: 13.5px; color: #16a34a; font-weight: 600;"><i
+                                    class="fa-solid fa-hand-holding-dollar" style="font-size: 11px; margin-right: 5px;"></i> (+) Encaissements Crédits (Remboursements)</td>
+                            <td style="padding: 12px 0; font-size: 14px; font-weight: 800; color: #16a34a; text-align: right;">
+                                +{{ number_format($totalDebtPayments, 0, ',', ' ') }} FCFA</td>
+                        </tr>
                         <tr style="border-top: 2px solid #cbd5e1;">
                             <td style="padding: 14px 0 0 0; font-size: 14px; font-weight: 800; color: #1e293b;">Solde Théorique
                                 de Clôture</td>
                             <td
                                 style="padding: 14px 0 0 0; font-size: 16px; font-weight: 800; color: #6366f1; text-align: right;">
-                                {{ $session->expected_closing_balance ? number_format($session->expected_closing_balance, 0, ',', ' ') . ' FCFA' : '—' }}
+                                {{ number_format($session->expected_closing_balance ?? ($session->opening_balance + $totalSalesAmount + $totalDebtPayments), 0, ',', ' ') }} FCFA
                             </td>
                         </tr>
                     </table>
@@ -409,6 +415,77 @@
                     </table>
                 </div>
             @endif
+            @endif
+        </div>
+    </div>
+
+    <!-- Journal des Encaissements de Crédits de la session -->
+    <div class="card"
+        style="border-radius: 12px; border: 1px solid var(--border); overflow: hidden; background: white; box-shadow: 0 1px 3px rgba(0,0,0,0.02); margin-top: 25px;">
+        <div
+            style="background: #f8fafc; border-bottom: 1px solid var(--border); padding: 15px 20px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <i class="fa-solid fa-hand-holding-dollar" style="color: #6366f1;"></i>
+                <h3
+                    style="margin: 0; font-size: 14.5px; font-weight: 800; color: #1e293b; text-transform: uppercase; letter-spacing: 0.02em;">
+                    Encaissements de Crédits durant la Session</h3>
+            </div>
+            <span
+                style="font-size: 11.5px; font-weight: 700; color: #475569; background: #e2e8f0; padding: 2px 8px; border-radius: 99px;">
+                {{ $debtPayments->count() }} Encaissements
+            </span>
+        </div>
+        <div class="card-body" style="padding:0;">
+            @if ($debtPayments->isEmpty())
+                <div style="text-align: center; padding: 40px 20px; color: var(--text-muted);">
+                    <div
+                        style="width: 48px; height: 48px; background: #f1f5f9; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 10px; color: #94a3b8; font-size: 18px;">
+                        <i class="fa-solid fa-circle-exclamation"></i>
+                    </div>
+                    <p style="font-weight: 600; margin: 0; color: #475569;">Aucun encaissement</p>
+                    <p style="font-size: 12.5px; margin-top: 3px;">Aucun remboursement de crédit n'a été perçu durant cette session.</p>
+                </div>
+            @else
+                <div class="table-responsive">
+                    <table class="data-table" style="width: 100%; border-collapse: collapse; text-align: left;">
+                        <thead>
+                            <tr style="background: #f8fafc; border-bottom: 1px solid var(--border);">
+                                <th style="padding: 12px 15px; font-size: 11.5px; font-weight: 700; color: #475569; text-transform: uppercase;">Référence</th>
+                                <th style="padding: 12px 15px; font-size: 11.5px; font-weight: 700; color: #475569; text-transform: uppercase; text-align: center;">Heure</th>
+                                <th style="padding: 12px 15px; font-size: 11.5px; font-weight: 700; color: #475569; text-transform: uppercase;">Client</th>
+                                <th style="padding: 12px 15px; font-size: 11.5px; font-weight: 700; color: #475569; text-transform: uppercase; text-align: center;">Mode</th>
+                                <th style="padding: 12px 15px; font-size: 11.5px; font-weight: 700; color: #475569; text-transform: uppercase; text-align: right;">Montant Encaissé</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach ($debtPayments as $payment)
+                                <tr style="border-bottom: 1px solid #f1f5f9; transition: background 0.2s;"
+                                    onmouseover="this.style.backgroundColor='#f8fafc'"
+                                    onmouseout="this.style.backgroundColor='transparent'">
+                                    <td style="padding: 12px 15px; font-size: 13px; font-weight: 700; color: #1e293b;">
+                                        {{ $payment->reference }}
+                                    </td>
+                                    <td style="padding: 12px 15px; font-size: 12.5px; color: #64748b; text-align: center;">
+                                        {{ $payment->created_at->format('H:i') }}
+                                    </td>
+                                    <td style="padding: 12px 15px; font-size: 13px; color: #475569;">
+                                        @if ($payment->customer)
+                                            <strong>{{ $payment->customer->name }}</strong>
+                                        @else
+                                            <span style="color: #94a3b8; font-style: italic;">Client inconnu/supprimé</span>
+                                        @endif
+                                    </td>
+                                    <td style="padding: 12px 15px; text-align: center;">
+                                        <span style="background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; font-size: 11px; padding: 2px 8px; border-radius: 4px; font-weight: 700;">Espèces</span>
+                                    </td>
+                                    <td style="padding: 12px 15px; font-weight: 700; font-size: 13.5px; color: #16a34a; text-align: right;">
+                                        +{{ number_format($payment->amount, 0, ',', ' ') }} FCFA
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
             @endif
         </div>
     </div>

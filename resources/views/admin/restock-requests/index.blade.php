@@ -48,13 +48,19 @@
                                     Catégorie</th>
                                 <th
                                     style="padding: 12px 15px; font-size: 11.5px; font-weight: 700; color: #475569; text-transform: uppercase; text-align: center;">
+                                    Stock Initial</th>
+                                <th
+                                    style="padding: 12px 15px; font-size: 11.5px; font-weight: 700; color: #475569; text-transform: uppercase; text-align: center;">
+                                    Stock Ajouté</th>
+                                <th
+                                    style="padding: 12px 15px; font-size: 11.5px; font-weight: 700; color: #475569; text-transform: uppercase; text-align: center;">
                                     Stock Actuel</th>
                                 <th
                                     style="padding: 12px 15px; font-size: 11.5px; font-weight: 700; color: #475569; text-transform: uppercase; text-align: center;">
                                     Demandé Par</th>
                                 <th
                                     style="padding: 12px 15px; font-size: 11.5px; font-weight: 700; color: #475569; text-transform: uppercase; text-align: center;">
-                                    Date de demande</th>
+                                    Date</th>
                                 <th
                                     style="padding: 12px 15px; font-size: 11.5px; font-weight: 700; color: #475569; text-transform: uppercase; text-align: center;">
                                     Statut</th>
@@ -86,9 +92,27 @@
                                     <td style="padding: 12px 15px; font-size: 13px; color: #64748b; text-align: center;">
                                         {{ $req->product ? $req->product->category_name : '—' }}
                                     </td>
-                                    <td style="padding: 12px 15px; text-align: center;">
+                                    <td style="padding: 12px 15px; text-align: center; font-size: 13px; color: #64748b;"
+                                        id="initial-stock-{{ $req->id }}">
+                                        @if($req->status === 'completed')
+                                            <span style="font-weight: 600; color: #475569;">{{ $req->initial_stock }}</span>
+                                        @else
+                                            <span style="color: #94a3b8;">—</span>
+                                        @endif
+                                    </td>
+                                    <td style="padding: 12px 15px; text-align: center; font-size: 13px;"
+                                        id="added-stock-{{ $req->id }}">
+                                        @if($req->status === 'completed')
+                                            <span style="font-weight: 700; color: #059669; background: #eefdf4; padding: 2px 6px; border-radius: 4px;">
+                                                +{{ $req->added_stock }}
+                                            </span>
+                                        @else
+                                            <span style="color: #94a3b8;">—</span>
+                                        @endif
+                                    </td>
+                                    <td style="padding: 12px 15px; text-align: center;" id="current-stock-{{ $req->id }}">
                                         @if ($req->product)
-                                            @if ($req->product->stock <= $req->product->stock_threshold)
+                                            @if ($req->product->stock <= ($req->product->stock_threshold ?? 5))
                                                 <span
                                                     style="background: #fff1f2; color: #e11d48; padding: 3px 8px; border-radius: 6px; font-size: 12px; font-weight: 700; border: 1px solid #fecdd3;">
                                                     {{ $req->product->stock }} (Seuil: {{ $req->product->stock_threshold }})
@@ -176,7 +200,6 @@
                         min: 1,
                         step: 1
                     },
-                    inputValue: 50,
                     showCancelButton: true,
                     confirmButtonText: 'Ajouter au Stock',
                     cancelButtonText: 'Annuler',
@@ -224,6 +247,33 @@
                                             <i class="fa-solid fa-circle-check"></i> Traitée
                                         </span>
                                     `;
+                                    }
+
+                                    const initialCell = document.getElementById('initial-stock-' + requestId);
+                                    if (initialCell && data.initial_stock !== undefined) {
+                                        initialCell.innerHTML = `<span style="font-weight: 600; color: #475569;">${data.initial_stock}</span>`;
+                                    }
+
+                                    const addedCell = document.getElementById('added-stock-' + requestId);
+                                    if (addedCell && data.added_stock !== undefined) {
+                                        addedCell.innerHTML = `<span style="font-weight: 700; color: #059669; background: #eefdf4; padding: 2px 6px; border-radius: 4px;">+${data.added_stock}</span>`;
+                                    }
+
+                                    const currentStockCell = document.getElementById('current-stock-' + requestId);
+                                    if (currentStockCell && data.new_stock !== undefined) {
+                                        if (data.threshold !== null && data.new_stock <= data.threshold) {
+                                            currentStockCell.innerHTML = `
+                                                <span style="background: #fff1f2; color: #e11d48; padding: 3px 8px; border-radius: 6px; font-size: 12px; font-weight: 700; border: 1px solid #fecdd3;">
+                                                    ${data.new_stock} (Seuil: ${data.threshold})
+                                                </span>
+                                            `;
+                                        } else {
+                                            currentStockCell.innerHTML = `
+                                                <span style="background: #eefdf4; color: #166534; padding: 3px 8px; border-radius: 6px; font-size: 12px; font-weight: 700; border: 1px solid #bbf7d0;">
+                                                    ${data.new_stock}
+                                                </span>
+                                            `;
+                                        }
                                     }
 
                                     const actionBtnCell = document.getElementById('action-btn-cell-' + requestId);

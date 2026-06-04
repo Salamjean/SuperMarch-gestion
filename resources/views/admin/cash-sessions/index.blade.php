@@ -180,7 +180,7 @@
                                         <div style="display: flex; align-items: center; gap: 8px;">
                                             <div
                                                 style="width: 28px; height: 28px; background: #f3e8ff; color: #a855f7; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 11px;">
-                                                {{ strtoupper(substr($sess->user->name ?? '?', 0, 1)) }}
+                                                {{ strtoupper(substr($sess->user?->name ?? '?', 0, 1)) }}
                                             </div>
                                             <span
                                                 style="font-size: 13.5px; font-weight: 700; color: #334155;">{{ $sess->user ? $sess->user->name : 'Inconnu' }}</span>

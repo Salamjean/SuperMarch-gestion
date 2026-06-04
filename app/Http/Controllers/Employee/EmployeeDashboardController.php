@@ -8,6 +8,7 @@ use App\Models\CashSession;
 use App\Models\Customer;
 use App\Models\Sale;
 use App\Models\SaleItem;
+use App\Models\DebtPayment;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -23,9 +24,12 @@ class EmployeeDashboardController extends Controller
 
         $expectedClosingBalance = 0;
         if ($activeSession) {
-            $expectedClosingBalance = $activeSession->opening_balance + Sale::where('cash_session_id', $activeSession->id)
+            $totalSales = Sale::where('cash_session_id', $activeSession->id)
                 ->where('status', 'completed')
                 ->sum('total_amount');
+            $totalRepayments = DebtPayment::where('cash_session_id', $activeSession->id)
+                ->sum('amount');
+            $expectedClosingBalance = $activeSession->opening_balance + $totalSales + $totalRepayments;
         }
 
         // Liste des clients
@@ -42,7 +46,7 @@ class EmployeeDashboardController extends Controller
         $salesQuery = Sale::where('user_id', auth()->id());
 
         // Toutes les ventes pour l'historique (avec client)
-        $sales = (clone $salesQuery)->with(['items.product', 'customer'])->latest()->take(50)->get();
+        $sales = (clone $salesQuery)->with(['items.product', 'customer', 'user'])->latest()->take(50)->get();
 
         // --- Statistiques ---
         // Ventes d'aujourd'hui
@@ -138,6 +142,16 @@ class EmployeeDashboardController extends Controller
             ], 422);
         }
 
+        if ($paymentMethod === 'credit' && $request->customer_id) {
+            $customer = Customer::find($request->customer_id);
+            if ($customer && $customer->is_credit_blocked) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "Ce client est bloqué pour les achats à crédit par l'administrateur."
+                ], 403);
+            }
+        }
+
         return DB::transaction(function () use ($request, $activeSession, $paymentMethod) {
             $sale = Sale::create([
                 'user_id' => auth()->id(),
@@ -151,15 +165,9 @@ class EmployeeDashboardController extends Controller
                 'status' => 'completed'
             ]);
 
-            // Gestion de la fidélité et du crédit client
+            // Gestion du crédit client
             if ($request->customer_id) {
                 $customer = Customer::findOrFail($request->customer_id);
-
-                // Calcul des points de fidélité (ex: 1 point par tranche de 10 €/$ vendus)
-                $earnedPoints = floor($request->total_amount / 10);
-                if ($earnedPoints > 0) {
-                    $customer->increment('loyalty_points', $earnedPoints);
-                }
 
                 // Si paiement à crédit, on augmente sa dette
                 if ($paymentMethod === 'credit') {
@@ -253,12 +261,15 @@ class EmployeeDashboardController extends Controller
             ], 400);
         }
 
-        // Calculer l'attendu théorique
+        // Calculer l'attendu théorique (ventes + encaissements de crédit)
         $totalSales = Sale::where('cash_session_id', $activeSession->id)
             ->where('status', 'completed')
             ->sum('total_amount');
 
-        $expected = $activeSession->opening_balance + $totalSales;
+        $totalRepayments = DebtPayment::where('cash_session_id', $activeSession->id)
+            ->sum('amount');
+
+        $expected = $activeSession->opening_balance + $totalSales + $totalRepayments;
         $actual = $request->actual_closing_balance;
         $difference = $actual - $expected;
 
@@ -328,6 +339,17 @@ class EmployeeDashboardController extends Controller
                 $item->update([
                     'returned_quantity' => $item->quantity
                 ]);
+            }
+
+            // Si c'était à crédit, on réduit la dette du client
+            if ($sale->customer_id) {
+                $customer = Customer::find($sale->customer_id);
+                if ($customer && $sale->payment_method === 'credit') {
+                    $debt = max(0, $sale->total_amount - $sale->amount_received);
+                    if ($debt > 0) {
+                        $customer->decrement('debt_balance', min($customer->debt_balance, $debt));
+                    }
+                }
             }
 
             // Mettre à jour le statut de la vente
@@ -446,15 +468,14 @@ class EmployeeDashboardController extends Controller
                             'created_at' => $saleObj['created_at'] ? Carbon::parse($saleObj['created_at']) : now(),
                         ]);
 
-                        // Loyalty & Debt calculation
+                        // Debt calculation
                         if ($sale->customer_id) {
                             $customer = Customer::find($sale->customer_id);
                             if ($customer) {
-                                $earnedPoints = floor($sale->total_amount / 10);
-                                if ($earnedPoints > 0) {
-                                    $customer->increment('loyalty_points', $earnedPoints);
-                                }
                                 if ($sale->payment_method === 'credit') {
+                                    if ($customer->is_credit_blocked) {
+                                        throw new \Exception("Le client {$customer->name} est bloqué pour les achats à crédit.");
+                                    }
                                     $debt = max(0, $sale->total_amount - $sale->amount_received);
                                     if ($debt > 0) {
                                         $customer->increment('debt_balance', $debt);
@@ -493,5 +514,57 @@ class EmployeeDashboardController extends Controller
             'syncedLocalIds' => $syncedIds,
             'errors' => $errors
         ]);
+    }
+
+    public function payCustomerDebt(Request $request, $id)
+    {
+        $activeSession = CashSession::where('user_id', auth()->id())->where('status', 'open')->first();
+        if (!$activeSession) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Aucune session de caisse ouverte. Vous devez ouvrir la caisse avant d\'encaisser.'
+            ], 403);
+        }
+
+        $request->validate([
+            'amount' => 'required|numeric|min:1'
+        ]);
+
+        $customer = Customer::findOrFail($id);
+        $amountToPay = min($customer->debt_balance, $request->amount);
+
+        if ($amountToPay <= 0) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Ce client n\'a pas de dette active.'
+            ], 400);
+        }
+
+        try {
+            return DB::transaction(function () use ($customer, $amountToPay, $activeSession) {
+                $customer->decrement('debt_balance', $amountToPay);
+
+                $payment = DebtPayment::create([
+                    'customer_id' => $customer->id,
+                    'user_id' => auth()->id(),
+                    'cash_session_id' => $activeSession->id,
+                    'amount' => $amountToPay,
+                    'reference' => 'PAY-' . strtoupper(Str::random(8)),
+                    'payment_method' => 'cash'
+                ]);
+
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Encaissement de ' . number_format($amountToPay, 0, ',', ' ') . ' FCFA enregistré avec succès.',
+                    'payment' => $payment->load(['customer', 'user']),
+                    'new_debt_balance' => $customer->debt_balance
+                ]);
+            });
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Une erreur est survenue lors de l\'enregistrement : ' . $e->getMessage()
+            ], 500);
+        }
     }
 }

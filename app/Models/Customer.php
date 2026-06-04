@@ -14,12 +14,21 @@ class Customer extends Model
         'phone',
         'email',
         'address',
-        'loyalty_points',
-        'debt_balance'
+        'debt_balance',
+        'is_credit_blocked'
+    ];
+
+    protected $casts = [
+        'is_credit_blocked' => 'boolean'
     ];
 
     public function sales()
     {
         return $this->hasMany(Sale::class);
+    }
+
+    public function debtPayments()
+    {
+        return $this->hasMany(DebtPayment::class);
     }
 }

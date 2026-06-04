@@ -24,12 +24,13 @@
     "main": "main.js",
     "build": {
         "appId": "com.appmobile.pos",
-        "productName": "SupermarchePOS",
+        "productName": "SuperMarche",
         "directories": {
             "output": "dist-production"
         },
         "win": {
-            "target": "nsis"
+            "target": "nsis",
+            "icon": "public/logo/icon_square.png"
         },
         "nsis": {
             "oneClick": false,
