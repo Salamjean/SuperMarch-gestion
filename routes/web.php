@@ -17,7 +17,7 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', [AdminAuthController::class, 'showLogin'])->name('home');
 
 // Auth (unique login page)
-Route::get('/login',  [AdminAuthController::class, 'showLogin'])->name('login');
+Route::get('/login', [AdminAuthController::class, 'showLogin'])->name('login');
 Route::post('/login', [AdminAuthController::class, 'login']);
 Route::delete('/logout', [AdminAuthController::class, 'logout'])->name('logout');
 
@@ -29,12 +29,12 @@ Route::prefix('admin')->name('admin.')->middleware('admin')->group(function () {
     Route::resource('employees', EmployeeController::class);
 
     Route::resource('categories', CategoryController::class);
-    Route::resource('suppliers',  SupplierController::class);
+    Route::resource('suppliers', SupplierController::class);
     Route::get('/products/threshold', [ProductController::class, 'thresholdIndex'])->name('products.threshold');
     Route::post('/products/{product}/restock', [ProductController::class, 'restock'])->name('products.restock');
     Route::get('/products/check-barcode', [ProductController::class, 'checkBarcode'])->name('products.check-barcode');
     Route::get('/products/restock-grid', [ProductController::class, 'restockGrid'])->name('products.restock-grid');
-    Route::resource('products',   ProductController::class);
+    Route::resource('products', ProductController::class);
     Route::get('/restock-requests', [AdminDashboardController::class, 'restockRequestsIndex'])->name('restock-requests.index');
     Route::post('/stock/request/{id}/resolve', [AdminDashboardController::class, 'resolveRestock'])->name('stock.resolve');
 
