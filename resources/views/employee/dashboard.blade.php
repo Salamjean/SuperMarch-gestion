@@ -3,52 +3,50 @@
 @section('title', 'Interface Caisse')
 
 @section('content')
-    <!-- Overlay d'ouverture de caisse (géré dynamiquement) -->
-    <div class="session-gate" id="session-gate"
-        style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(10px); z-index: 9999; display: {{ !$activeSession ? 'flex' : 'none' }}; align-items: center; justify-content: center; color: white;">
-        <div class="gate-card"
-            style="background: #1e293b; border: 1px solid #334155; border-radius: 20px; padding: 40px; width: 100%; max-width: 450px; text-align: center; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);">
-            <div
-                style="background: rgba(99, 102, 241, 0.15); width: 80px; height: 80px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px;">
-                <i class="fa-solid fa-cash-register" style="font-size: 36px; color: #6366f1;"></i>
-            </div>
-            <h2 style="margin: 0 0 10px; font-size: 24px; font-weight: 700;">Ouverture de la Caisse</h2>
-            <p style="color: #94a3b8; font-size: 14px; margin: 0 0 30px;">Veuillez déclarer le montant du fond de caisse
-                initial disponible dans le tiroir-caisse pour démarrer votre journée.</p>
-
-            <form id="open-session-form" onsubmit="submitOpenSession(event)">
-                <div style="text-align: left; margin-bottom: 20px;">
-                    <label for="opening_balance"
-                        style="display: block; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #94a3b8; margin-bottom: 8px;">Fond
-                        de caisse initial (FCFA)</label>
-                    <input type="number" id="opening_balance" required min="0" value="0"
-                        style="width: 100%; background: #0f172a; border: 1px solid #334155; border-radius: 12px; padding: 12px 16px; color: white; font-size: 18px; font-weight: 600; text-align: center; outline: none; transition: border-color 0.2s;"
-                        placeholder="0 FCFA" autofocus>
+    @if (!$activeSession)
+        <!-- Overlay d'ouverture de caisse -->
+        <div class="session-gate"
+            style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(10px); z-index: 9999; display: flex; align-items: center; justify-content: center; color: white;">
+            <div class="gate-card"
+                style="background: #1e293b; border: 1px solid #334155; border-radius: 20px; padding: 40px; width: 100%; max-width: 450px; text-align: center; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);">
+                <div
+                    style="background: rgba(99, 102, 241, 0.15); width: 80px; height: 80px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px;">
+                    <i class="fa-solid fa-cash-register" style="font-size: 36px; color: #6366f1;"></i>
                 </div>
-                <button type="submit"
-                    style="width: 100%; background: #6366f1; color: white; border: none; border-radius: 12px; padding: 14px; font-size: 16px; font-weight: 600; cursor: pointer; transition: background 0.2s; display: flex; align-items: center; justify-content: center; gap: 10px;"
-                    onmouseover="this.style.background='#4f46e5'" onmouseout="this.style.background='#6366f1'">
-                    <i class="fa-solid fa-play"></i> DÉMARRER LA SESSION
-                </button>
-            </form>
+                <h2 style="margin: 0 0 10px; font-size: 24px; font-weight: 700;">Ouverture de la Caisse</h2>
+                <p style="color: #94a3b8; font-size: 14px; margin: 0 0 30px;">Veuillez déclarer le montant du fond de caisse
+                    initial disponible dans le tiroir-caisse pour démarrer votre journée.</p>
 
-            <!-- Bouton de retour à la connexion -->
-            <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #334155;">
-                <form method="POST" action="{{ route('logout') }}">
-                    @csrf
-                    @method('DELETE')
+                <form id="open-session-form" onsubmit="submitOpenSession(event)">
+                    <div style="text-align: left; margin-bottom: 20px;">
+                        <label for="opening_balance"
+                            style="display: block; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #94a3b8; margin-bottom: 8px;">Fond
+                            de caisse initial (FCFA)</label>
+                        <input type="number" id="opening_balance" required min="0" value="0"
+                            style="width: 100%; background: #0f172a; border: 1px solid #334155; border-radius: 12px; padding: 12px 16px; color: white; font-size: 18px; font-weight: 600; text-align: center; outline: none; transition: border-color 0.2s;"
+                            placeholder="0 FCFA" autofocus>
+                    </div>
                     <button type="submit"
-                        style="width: 100%; background: transparent; color: #94a3b8; border: 1px solid #334155; border-radius: 12px; padding: 12px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px;"
-                        onmouseover="this.style.background='rgba(239,68,68,0.1)'; this.style.color='#f87171'; this.style.borderColor='rgba(239,68,68,0.4)'"
-                        onmouseout="this.style.background='transparent'; this.style.color='#94a3b8'; this.style.borderColor='#334155'">
-                        <i class="fa-solid fa-arrow-right-from-bracket"></i>
-                        Changer de compte / Se déconnecter
+                        style="width: 100%; background: #6366f1; color: white; border: none; border-radius: 12px; padding: 14px; font-size: 16px; font-weight: 600; cursor: pointer; transition: background 0.2s; display: flex; align-items: center; justify-content: center; gap: 10px;">
+                        <i class="fa-solid fa-play"></i> DÉMARRER LA SESSION
                     </button>
                 </form>
+
+                <!-- Bouton Se Déconnecter -->
+                <div style="margin-top: 20px; border-top: 1px solid #334155; padding-top: 20px;">
+                    <form method="POST" action="{{ route('logout') }}">
+                        @csrf @method('DELETE')
+                        <button type="submit"
+                            style="width: 100%; background: transparent; color: #f87171; border: 1px dashed #f87171; border-radius: 12px; padding: 12px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px;"
+                            onmouseover="this.style.background='rgba(239, 68, 68, 0.1)';"
+                            onmouseout="this.style.background='transparent';">
+                            <i class="fa-solid fa-right-from-bracket"></i> SE DÉCONNECTER
+                        </button>
+                    </form>
+                </div>
             </div>
         </div>
-    </div>
-
+    @endif
 
     <!-- POS Central (Caisse View) -->
     <main class="pos-center" id="view-caisse">
@@ -62,12 +60,14 @@
                 <i class="fa-solid fa-list-check"></i>
                 <span>Voir Non-Enrôlés</span>
             </button>
-            <button class="close-session-btn" id="close-session-btn" onclick="showCloseSessionModal()"
-                style="background: #ef4444; color: white; border: none; padding: 10px 18px; border-radius: 12px; font-weight: bold; cursor: pointer; display: {{ $activeSession ? 'flex' : 'none' }}; align-items: center; gap: 8px; font-size: 13px; transition: background 0.2s; white-space: nowrap;"
-                onmouseover="this.style.background='#dc2626'" onmouseout="this.style.background='#ef4444'">
-                <i class="fa-solid fa-shop-slash"></i>
-                <span>Fermer la caisse</span>
-            </button>
+            @if ($activeSession)
+                <button class="close-session-btn" onclick="showCloseSessionModal()"
+                    style="background: #ef4444; color: white; border: none; padding: 10px 18px; border-radius: 12px; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 13px; transition: background 0.2s; white-space: nowrap;"
+                    onmouseover="this.style.background='#dc2626'" onmouseout="this.style.background='#ef4444'">
+                    <i class="fa-solid fa-shop-slash"></i>
+                    <span>Fermer la caisse</span>
+                </button>
+            @endif
         </div>
 
         <div class="category-filter">
@@ -82,12 +82,17 @@
                 <div class="product-card" id="prod-card-{{ $product->id }}" data-name="{{ strtolower($product->name) }}"
                     data-ref="{{ strtolower($product->reference) }}" data-category="{{ $product->category_name }}"
                     style="display: flex;" onclick="addToCart({{ json_encode($product) }})">
+                    <div class="product-card-stock-badge product-stock" id="stock-badge-{{ $product->id }}"
+                        style="color: {{ $product->stock <= $product->stock_threshold ? '#e11d48' : '#059669' }};">
+                        Stock: {{ $product->stock }}
+                    </div>
                     <div class="selected-indicator">0</div>
                     <div class="product-img">
                         @if ($product->image)
                             <img src="{{ asset('storage/' . $product->image) }}" alt="{{ $product->name }}">
                         @else
-                            <div style="width:100%; height:100%; background: linear-gradient(135deg, #004d99, #1a6bbf); display:flex; align-items:center; justify-content:center; color:white; font-weight:800; font-size:28px;">
+                            <div
+                                style="width:100%; height:100%; background: linear-gradient(135deg, #004d99, #1a6bbf); display:flex; align-items:center; justify-content:center; color:white; font-weight:800; font-size:28px;">
                                 {{ strtoupper(mb_substr($product->name, 0, 1)) }}
                             </div>
                         @endif
@@ -159,7 +164,8 @@
                 style="width: 100%; border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; font-size: 13px; color: var(--text); background: white; outline: none; cursor: pointer;">
                 <option value="" data-blocked="0">Client de passage (Anonyme)</option>
                 @foreach ($customers as $c)
-                    <option value="{{ $c->id }}" data-blocked="{{ $c->is_credit_blocked ? '1' : '0' }}">{{ $c->name }} {{ $c->phone ? '(' . $c->phone . ')' : '' }}
+                    <option value="{{ $c->id }}" data-blocked="{{ $c->is_credit_blocked ? '1' : '0' }}">
+                        {{ $c->name }} {{ $c->phone ? '(' . $c->phone . ')' : '' }}
                     </option>
                 @endforeach
             </select>
@@ -197,7 +203,10 @@
     <div id="receipt-print">
         <div style="text-align: center; margin-bottom: 15px;">
             <p style="margin: 0; font-size: 18px; font-weight: normal;">{{ $storeSettings->store_name }}</p>
-            <p style="margin: 5px 0; font-size: 11px;">{{ $storeSettings->address }}<br>Tel: {{ $storeSettings->phone }}@if($storeSettings->email)<br>Email: {{ $storeSettings->email }}@endif
+            <p style="margin: 5px 0; font-size: 11px;">{{ $storeSettings->address }}<br>Tel: {{ $storeSettings->phone }}
+                @if ($storeSettings->email)
+                    <br>Email: {{ $storeSettings->email }}
+                @endif
             </p>
             <div style="border-bottom: 1px dashed #000; margin: 10px 0;"></div>
             <p style="margin: 5px 0;" id="receipt-ref">REF: #SAL-000000</p>
@@ -240,7 +249,8 @@
 
         <div style="text-align: center; margin-top: 20px; font-size: 10px;">
             <div id="receipt-qrcode" style="display: flex; justify-content: center; margin-bottom: 10px;"></div>
-            <p style="margin: 5px 0; line-height: 1.4;">{{ $storeSettings->invoice_footer ?? "Merci de votre visite ! A bientôt." }}</p>
+            <p style="margin: 5px 0; line-height: 1.4;">
+                {{ $storeSettings->invoice_footer ?? 'Merci de votre visite ! A bientôt.' }}</p>
         </div>
     </div>
 
@@ -250,10 +260,14 @@
             <!-- Header -->
             <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px;">
                 <div>
-                    <h1 style="margin: 0 0 5px 0; font-size: 24px; font-weight: 800; color: #004d99; letter-spacing: -0.5px;">{{ $storeSettings->store_name }}</h1>
+                    <h1
+                        style="margin: 0 0 5px 0; font-size: 24px; font-weight: 800; color: #004d99; letter-spacing: -0.5px;">
+                        {{ $storeSettings->store_name }}</h1>
                     <p style="margin: 0; font-size: 12px; color: #64748b; line-height: 1.6;">
                         {{ $storeSettings->address }}<br>
-                        Tel: {{ $storeSettings->phone }}@if($storeSettings->email) / Email: {{ $storeSettings->email }}@endif
+                        Tel: {{ $storeSettings->phone }}@if ($storeSettings->email)
+                            / Email: {{ $storeSettings->email }}
+                        @endif
                     </p>
                 </div>
                 <div style="text-align: right;">
@@ -270,14 +284,21 @@
             <!-- Meta info grid -->
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px;">
                 <div>
-                    <h3 style="margin: 0 0 8px 0; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #64748b;">Client :</h3>
-                    <p id="receipt-a4-customer-box" style="margin: 0; font-size: 14px;"><strong>Client de Passage</strong></p>
+                    <h3
+                        style="margin: 0 0 8px 0; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #64748b;">
+                        Client :</h3>
+                    <p id="receipt-a4-customer-box" style="margin: 0; font-size: 14px;"><strong>Client de Passage</strong>
+                    </p>
                 </div>
                 <div style="text-align: right;">
-                    <h3 style="margin: 0 0 8px 0; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #64748b;">Opérateur :</h3>
-                    <p style="margin: 0 0 5px 0; font-size: 14px;"><strong id="receipt-a4-cashier">Caissier: —</strong></p>
+                    <h3
+                        style="margin: 0 0 8px 0; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #64748b;">
+                        Opérateur :</h3>
+                    <p style="margin: 0 0 5px 0; font-size: 14px;"><strong id="receipt-a4-cashier">Caissier: —</strong>
+                    </p>
                     <p style="margin: 0 0 3px 0; font-size: 12px; color: #64748b;">Rôle : Caissier / POS</p>
-                    <p style="margin: 0; font-size: 12px; color: #64748b;">Mode de paiement : <strong id="receipt-a4-method">Espèces</strong></p>
+                    <p style="margin: 0; font-size: 12px; color: #64748b;">Mode de paiement : <strong
+                            id="receipt-a4-method">Espèces</strong></p>
                 </div>
             </div>
 
@@ -285,10 +306,18 @@
             <table style="width: 100%; border-collapse: collapse; margin-bottom: 30px;">
                 <thead>
                     <tr style="background: #f8fafc; border-bottom: 2px solid #e2e8f0; text-align: left;">
-                        <th style="padding: 12px 10px; font-size: 11px; font-weight: 700; text-transform: uppercase; color: #475569;">Désignation de l'article</th>
-                        <th style="text-align: center; width: 120px; padding: 12px 10px; font-size: 11px; font-weight: 700; text-transform: uppercase; color: #475569;">Prix unitaire</th>
-                        <th style="text-align: center; width: 80px; padding: 12px 10px; font-size: 11px; font-weight: 700; text-transform: uppercase; color: #475569;">Quantité</th>
-                        <th style="text-align: right; width: 150px; padding: 12px 10px; font-size: 11px; font-weight: 700; text-transform: uppercase; color: #475569;">Montant Total</th>
+                        <th
+                            style="padding: 12px 10px; font-size: 11px; font-weight: 700; text-transform: uppercase; color: #475569;">
+                            Désignation de l'article</th>
+                        <th
+                            style="text-align: center; width: 120px; padding: 12px 10px; font-size: 11px; font-weight: 700; text-transform: uppercase; color: #475569;">
+                            Prix unitaire</th>
+                        <th
+                            style="text-align: center; width: 80px; padding: 12px 10px; font-size: 11px; font-weight: 700; text-transform: uppercase; color: #475569;">
+                            Quantité</th>
+                        <th
+                            style="text-align: right; width: 150px; padding: 12px 10px; font-size: 11px; font-weight: 700; text-transform: uppercase; color: #475569;">
+                            Montant Total</th>
                     </tr>
                 </thead>
                 <tbody id="receipt-a4-items">
@@ -299,15 +328,18 @@
             <!-- Totaux (sans signature) -->
             <div style="display: flex; justify-content: flex-end; margin-top: 20px;">
                 <div style="width: 300px;">
-                    <div style="display: flex; justify-content: space-between; padding: 8px 0; font-size: 13px; border-bottom: 1px solid #f1f5f9;">
+                    <div
+                        style="display: flex; justify-content: space-between; padding: 8px 0; font-size: 13px; border-bottom: 1px solid #f1f5f9;">
                         <span>Total Global:</span>
                         <strong id="receipt-a4-total" style="font-size: 16px; color: #004d99;">0 FCFA</strong>
                     </div>
-                    <div style="display: flex; justify-content: space-between; padding: 8px 0; font-size: 13px; border-bottom: 1px solid #f1f5f9; color: #64748b;">
+                    <div
+                        style="display: flex; justify-content: space-between; padding: 8px 0; font-size: 13px; border-bottom: 1px solid #f1f5f9; color: #64748b;">
                         <span>Montant Encaissé:</span>
                         <span id="receipt-a4-received">0 FCFA</span>
                     </div>
-                    <div style="display: flex; justify-content: space-between; padding: 8px 0; font-size: 13px; border-bottom: 1px solid #f1f5f9; color: #64748b;">
+                    <div
+                        style="display: flex; justify-content: space-between; padding: 8px 0; font-size: 13px; border-bottom: 1px solid #f1f5f9; color: #64748b;">
                         <span>Monnaie Rendue:</span>
                         <span id="receipt-a4-change">0 FCFA</span>
                     </div>
@@ -315,9 +347,11 @@
             </div>
 
             <!-- Footer -->
-            <div style="margin-top: 40px; text-align: center; border-top: 1px dashed #e2e8f0; padding-top: 20px; font-size: 11px; color: #64748b; line-height: 1.5;">
+            <div
+                style="margin-top: 40px; text-align: center; border-top: 1px dashed #e2e8f0; padding-top: 20px; font-size: 11px; color: #64748b; line-height: 1.5;">
                 <p id="receipt-a4-footer">{{ $storeSettings->invoice_footer ?? 'Merci pour votre confiance !' }}</p>
-                <p style="font-size: 10px; color: #94a3b8; margin-top: 10px;">{{ $storeSettings->store_name }} - Solution de Facturation Intégrée</p>
+                <p style="font-size: 10px; color: #94a3b8; margin-top: 10px;">{{ $storeSettings->store_name }} - Solution
+                    de Facturation Intégrée</p>
             </div>
         </div>
     </div>
@@ -428,10 +462,81 @@
         setInterval(updateClock, 1000);
         updateClock();
         // POS Logic
+        let productsRegistry = @json($allProducts->keyBy('id'));
         let cart = JSON.parse(localStorage.getItem('pos_cart')) || [];
         let currentCategory = 'all';
         let showManual = false;
         let hasBeenScanned = false; // Flag pour savoir si un scan a eu lieu
+
+        async function refreshProductStocks() {
+            try {
+                const response = await fetch('{{ route('employee.pos.products-stock') }}');
+                if (!response.ok) return;
+                const data = await response.json();
+                if (data && data.success && Array.isArray(data.products)) {
+                    data.products.forEach(p => {
+                        // Mettre à jour dans notre registre local
+                        if (productsRegistry[p.id]) {
+                            productsRegistry[p.id].stock = p.stock;
+                        } else {
+                            productsRegistry[p.id] = {
+                                id: p.id,
+                                stock: p.stock,
+                                stock_threshold: p.stock_threshold
+                            };
+                        }
+
+                        // Mettre à jour l'élément badge de stock du produit dans la grille POS
+                        const badge = document.getElementById(`stock-badge-${p.id}`);
+                        const card = document.getElementById(`prod-card-${p.id}`);
+                        const threshold = p.stock_threshold !== undefined ? p.stock_threshold : 5;
+                        const isLow = p.stock <= threshold;
+
+                        if (badge) {
+                            badge.textContent = `Stock: ${p.stock}`;
+                            badge.style.color = isLow ? '#e11d48' : '#059669';
+                        }
+
+                        if (card) {
+                            if (p.stock <= 0) {
+                                card.style.opacity = '0.5';
+                                card.style.pointerEvents = 'none';
+                                if (badge) {
+                                    badge.textContent = `En rupture`;
+                                    badge.style.color = '#e11d48';
+                                }
+                            } else {
+                                card.style.opacity = '1';
+                                card.style.pointerEvents = 'auto';
+                            }
+                        }
+
+                        // Mettre à jour la ligne de stock dans le tableau de l'onglet Inventaire/Stock
+                        const stockValCell = document.getElementById(`stock-val-${p.id}`);
+                        if (stockValCell) {
+                            if (isLow) {
+                                stockValCell.innerHTML = `
+                                    <span style="background: #fff1f2; color: #e11d48; padding: 4px 10px; border-radius: 6px; font-size: 13px; font-weight: 700;">
+                                        ${p.stock} (Bas)
+                                    </span>
+                                `;
+                            } else {
+                                stockValCell.innerHTML = `
+                                    <span style="background: #e8f9f0; color: #059669; padding: 4px 10px; border-radius: 6px; font-size: 13px; font-weight: 700;">
+                                        ${p.stock}
+                                    </span>
+                                `;
+                            }
+                        }
+                    });
+                }
+            } catch (err) {
+                console.error("Erreur actualisation stocks:", err);
+            }
+        }
+
+        // Lancer l'actualisation en arrière-plan toutes les 2 secondes
+        setInterval(refreshProductStocks, 2000);
 
         function searchProducts() {
             const query = document.getElementById('search-input').value.toLowerCase();
@@ -481,20 +586,21 @@
         }
 
         function addToCart(product) {
+            const registryProduct = productsRegistry[product.id] || product;
             const existing = cart.find(item => item.id === product.id);
             if (existing) {
-                if (existing.qty >= product.stock) {
+                if (existing.qty >= registryProduct.stock) {
                     Swal.fire('Oups!', 'Stock insuffisant', 'warning');
                     return;
                 }
                 existing.qty++;
             } else {
-                if (product.stock <= 0) {
+                if (registryProduct.stock <= 0) {
                     Swal.fire('Oups!', 'Produit en rupture de stock', 'error');
                     return;
                 }
                 cart.push({
-                    ...product,
+                    ...registryProduct,
                     qty: 1
                 });
             }
@@ -505,11 +611,12 @@
         function updateQty(id, delta) {
             const item = cart.find(i => i.id === id);
             if (item) {
+                const registryProduct = productsRegistry[id] || item;
                 item.qty += delta;
                 if (item.qty <= 0) {
                     removeFromCart(id);
-                } else if (item.qty > item.stock) {
-                    item.qty = item.stock;
+                } else if (item.qty > registryProduct.stock) {
+                    item.qty = registryProduct.stock;
                     Swal.fire('Max!', 'Stock maximum atteint', 'info');
                 }
             }
@@ -608,11 +715,12 @@
                 const itemTotal = item.price * item.qty;
                 total += itemTotal;
                 itemsCount += item.qty;
+                const currentStock = productsRegistry[item.id] ? productsRegistry[item.id].stock : item.stock;
                 return `
                             <div class="cart-item">
                                 <div class="item-details">
                                     <div class="item-name">${item.name}</div>
-                                    <div class="item-meta">Stock dispo: ${item.stock}</div>
+                                    <div class="item-meta">Stock dispo: ${currentStock}</div>
                                 </div>
                                 <div class="item-qty">
                                     <button class="qty-btn" onclick="updateQty(${item.id}, -1)">-</button>
@@ -673,14 +781,14 @@
                                     ${customerId ? `<p style="margin:5px 0 0 0; font-size:13px; color:#4b5563;"><i class="fa-solid fa-user"></i> Client : <strong>${customerName}</strong></p>` : ''}
                                 </div>
                                 ${customerId ? `
-                                <div style="margin-bottom: 15px;">
-                                    <label style="font-weight: 600; display: block; margin-bottom: 6px; color: var(--text);">Type de Vente :</label>
-                                    <select id="swal-sale-type" class="form-control" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--card);">
-                                        <option value="paiement" selected>Paiement Direct (Comptant)</option>
-                                        <option value="credit">Vente à Crédit (Compte client)</option>
-                                    </select>
-                                </div>
-                                ` : '<input type="hidden" id="swal-sale-type" value="paiement">'}
+                                                            <div style="margin-bottom: 15px;">
+                                                                <label style="font-weight: 600; display: block; margin-bottom: 6px; color: var(--text);">Type de Vente :</label>
+                                                                <select id="swal-sale-type" class="form-control" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--card);">
+                                                                    <option value="paiement" selected>Paiement Direct (Comptant)</option>
+                                                                    <option value="credit">Vente à Crédit (Compte client)</option>
+                                                                </select>
+                                                            </div>
+                                                            ` : '<input type="hidden" id="swal-sale-type" value="paiement">'}
                                 <div id="payment-method-container" style="margin-bottom: 15px;">
                                     <label style="font-weight: 600; display: block; margin-bottom: 6px; color: var(--text);">Moyen de Paiement :</label>
                                     <select id="swal-payment-method" class="form-control" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--card);">
@@ -704,15 +812,17 @@
                     const paymentMethodContainer = document.getElementById('payment-method-container');
                     const receivedContainer = document.getElementById('received-amount-container');
                     const amountInput = document.getElementById('swal-amount-received');
-                    
+
                     if (saleType) {
                         const toggleFields = () => {
                             if (saleType.value === 'credit') {
-                                if (paymentMethodContainer) paymentMethodContainer.style.display = 'none';
+                                if (paymentMethodContainer) paymentMethodContainer.style.display =
+                                    'none';
                                 if (receivedContainer) receivedContainer.style.display = 'none';
                                 amountInput.value = 0;
                             } else {
-                                if (paymentMethodContainer) paymentMethodContainer.style.display = 'block';
+                                if (paymentMethodContainer) paymentMethodContainer.style.display =
+                                    'block';
                                 if (receivedContainer) receivedContainer.style.display = 'block';
                                 amountInput.value = total;
                             }
@@ -723,7 +833,8 @@
                 },
                 preConfirm: () => {
                     const saleType = document.getElementById('swal-sale-type').value;
-                    const paymentMethod = saleType === 'credit' ? 'credit' : document.getElementById('swal-payment-method').value;
+                    const paymentMethod = saleType === 'credit' ? 'credit' : document.getElementById(
+                        'swal-payment-method').value;
                     const amountInput = document.getElementById('swal-amount-received');
                     const amountReceived = parseFloat(amountInput.value || 0);
 
@@ -775,130 +886,78 @@
                 isCurrentlyOnline = await checkActualConnection();
             }
 
-            const isElectron = typeof window.electronAPI !== 'undefined';
-            let currentUserId = {{ auth()->id() ?? 'null' }};
-            let currentSessionId = {{ $activeSession->id ?? 'null' }};
+            if (!isCurrentlyOnline) {
+                // FALLBACK MODE OFFLINE : Enregistrement local
+                const offlineReference = 'SAL-OFF-' + Math.random().toString(36).substr(2, 9).toUpperCase();
 
-            if (isElectron) {
-                try {
-                    const localSession = await window.electronAPI.invoke('sqlite-get-active-session', currentUserId);
-                    if (localSession) {
-                        currentSessionId = localSession.id;
-                    }
-                } catch (e) {
-                    console.error("Erreur de récupération de session active SQLite:", e);
-                }
-            }
-
-            const offlineReference = 'SAL-OFF-' + Math.random().toString(36).substr(2, 9).toUpperCase();
-            
-            const saleData = {
-                userId: currentUserId,
-                cashSessionId: currentSessionId,
-                items: cart,
-                total_amount: total,
-                amount_received: received,
-                change_amount: change,
-                customer_id: customerIdVal,
-                payment_method: paymentMethodSelected,
-                reference: offlineReference,
-                created_at: new Date().toISOString()
-            };
-
-            // Mettre à jour fictivement les stocks locaux dans l'interface en attendant la synchro
-            cart.forEach(item => {
-                const card = document.getElementById(`prod-card-${item.id}`);
-                if (card) {
-                    const stockBadge = card.querySelector('.product-stock');
-                    if (stockBadge) {
-                        let currStock = parseInt(stockBadge.textContent.replace('Stock: ', '')) || 0;
-                        let nextStock = Math.max(0, currStock - item.qty);
-                        stockBadge.textContent = `Stock: ${nextStock}`;
-                    }
-                }
-            });
-
-            if (isElectron) {
-                // ── Mode Electron : Enregistrement local SQLite systématique ──
-                try {
-                    const localResult = await saveOfflineSale(saleData);
-                    if (!localResult.success) {
-                        throw new Error(localResult.message);
-                    }
-
-                    // Imprimer le reçu localement
-                    const printedSale = localResult.sale || saleData;
-                    printLocalReceipt(printedSale);
-
-                    if (isCurrentlyOnline) {
-                        // Tenter de pousser la vente en ligne immédiatement
-                        try {
-                            const pushResult = await window.electronAPI.invoke('sqlite-push', {
-                                baseUrl: window.location.origin,
-                                sessionCookie: document.cookie
-                            });
-                            if (pushResult.success && pushResult.synced > 0) {
-                                console.log("Vente synchronisée en ligne immédiatement.");
-                            }
-                        } catch (pushErr) {
-                            console.warn("Échec du push immédiat en tâche de fond (elle sera retentée) :", pushErr);
+                // Mettre à jour fictivement les stocks locaux dans l'interface en attendant la synchro
+                cart.forEach(item => {
+                    const card = document.getElementById(`prod-card-${item.id}`);
+                    if (card) {
+                        const stockBadge = card.querySelector('.product-stock');
+                        if (stockBadge) {
+                            let currStock = parseInt(stockBadge.textContent.replace('Stock: ', '')) || 0;
+                            let nextStock = Math.max(0, currStock - item.qty);
+                            stockBadge.textContent = `Stock: ${nextStock}`;
                         }
                     }
+                });
 
-                    Swal.fire({
-                        title: isCurrentlyOnline ? 'Vente enregistrée !' : 'Vente sauvegardée (Hors-ligne)',
-                        text: isCurrentlyOnline ? 'La vente a été enregistrée localement et synchronisée en ligne.' : 'La vente a été enregistrée localement et sera synchronisée dès le retour d\'une connexion internet.',
-                        icon: 'success'
-                    }).then(() => {
-                        cart = [];
-                        saveCart();
-                        updateCartUI();
-                        location.reload();
-                    });
-
-                } catch (err) {
-                    console.error("Erreur de sauvegarde locale SQLite :", err);
-                    Swal.fire("Erreur", "Impossible d'enregistrer la vente localement : " + err.message, "error");
-                }
-                return;
-            }
-
-            // ── Mode standard (hors Electron - par exemple navigateur Web direct) ──
-            if (!isCurrentlyOnline) {
-                try {
-                    await saveOfflineSale(saleData);
-                    printLocalReceipt(saleData);
-                    Swal.fire({
-                        title: 'Vente sauvegardée (Hors-ligne)',
-                        text: 'La vente a été enregistrée localement.',
-                        icon: 'success'
-                    }).then(() => {
-                        cart = [];
-                        saveCart();
-                        updateCartUI();
-                    });
-                } catch (err) {
-                    Swal.fire("Erreur", "Impossible d'enregistrer la vente hors-ligne.", "error");
-                }
-                return;
-            }
-
-            // En ligne normal sur navigateur
-            fetch('{{ route('employee.pos.checkout') }}', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': '{{ csrf_token() }}'
-                },
-                body: JSON.stringify({
+                const offlineSale = {
+                    user_id: {{ auth()->id() }},
+                    cash_session_id: {{ $activeSession->id ?? 'null' }},
                     items: cart,
                     total_amount: total,
                     amount_received: received,
                     change_amount: change,
                     customer_id: customerIdVal,
-                    payment_method: paymentMethodSelected
+                    payment_method: paymentMethodSelected,
+                    reference: offlineReference,
+                    created_at: new Date().toISOString()
+                };
+
+                try {
+                    if (window.electronAPI && typeof window.electronAPI.saveOfflineSale === 'function') {
+                        await window.electronAPI.saveOfflineSale(offlineSale);
+                    } else {
+                        console.warn("saveOfflineSale non disponible dans ce navigateur, sauvegarde locale simulée.");
+                    }
+                    printLocalReceipt(offlineSale);
+
+                    Swal.fire({
+                        title: 'Vente sauvegardée (Hors-ligne)',
+                        text: 'La vente a été enregistrée localement et sera synchronisée dès le retour d\'une connexion internet.',
+                        icon: 'success',
+                        timer: 2000,
+                        showConfirmButton: false
+                    }).then(() => {
+                        cart = [];
+                        saveCart();
+                        updateCartUI();
+                        refreshProductStocks();
+                    });
+                } catch (err) {
+                    console.error("Erreur de sauvegarde locale :", err);
+                    Swal.fire("Erreur", "Impossible d'enregistrer la vente localement.", "error");
+                }
+                return;
+            }
+
+            fetch('{{ route('employee.pos.checkout') }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                    },
+                    body: JSON.stringify({
+                        items: cart,
+                        total_amount: total,
+                        amount_received: received,
+                        change_amount: change,
+                        customer_id: customerIdVal,
+                        payment_method: paymentMethodSelected
+                    })
                 })
-            })
                 .then(response => {
                     if (!response.ok) {
                         return response.json().then(err => {
@@ -928,20 +987,32 @@
                                 html: alertMsg,
                                 icon: 'warning',
                                 confirmButtonText: 'Compris'
-                            }).then(() => location.reload());
+                            }).then(() => {
+                                cart = [];
+                                saveCart();
+                                updateCartUI();
+                                refreshProductStocks();
+                            });
                         } else {
-                            Swal.fire('Succès!', 'Vente enregistrée et ticket imprimé', 'success').then(
-                                () => location.reload());
+                            Swal.fire({
+                                title: 'Succès !',
+                                text: 'Vente enregistrée et ticket imprimé.',
+                                icon: 'success',
+                                timer: 2000,
+                                showConfirmButton: false
+                            }).then(() => {
+                                cart = [];
+                                saveCart();
+                                updateCartUI();
+                                refreshProductStocks();
+                            });
                         }
-
-                        cart = [];
-                        saveCart();
-                        updateCartUI();
                     }
                 })
                 .catch(error => {
                     console.error("Erreur validation vente :", error);
-                    Swal.fire('Erreur !', error.message || 'Une erreur est survenue lors de la validation.', 'error');
+                    Swal.fire('Erreur !', error.message || 'Une erreur est survenue lors de la validation.',
+                        'error');
                 });
         }
 
@@ -952,12 +1023,13 @@
             const reference = saleObj.reference || 'INCONNUE';
             const created_at = saleObj.created_at || new Date().toISOString();
             const now = new Date(created_at);
-            
+
             const totalAmount = parseFloat(saleObj.total_amount || saleObj.total || 0);
             const amountReceived = parseFloat(saleObj.amount_received || saleObj.received || 0);
             const changeAmount = parseFloat(saleObj.change_amount || saleObj.change || 0);
-            const cashierNameVal = (saleObj.user && saleObj.user.name) ? saleObj.user.name : (document.querySelector('.cashier-name')?.textContent || 'Caisse');
-            
+            const cashierNameVal = (saleObj.user && saleObj.user.name) ? saleObj.user.name : (document.querySelector(
+                '.cashier-name')?.textContent || 'Caisse');
+
             let methodText = 'Espèces';
             if (saleObj.payment_method === 'card') methodText = 'CB / Mobile Money';
             if (saleObj.payment_method === 'credit') methodText = 'Crédit (Dette client)';
@@ -1111,12 +1183,12 @@
                                             const unitPrice = item.unit_price || item.price || 0;
                                             const lineTotal = unitPrice * qty;
                                             return `
-                                                <tr style="border-bottom: 1px dotted #eee;">
-                                                    <td style="padding: 8px 0;">${prodName}</td>
-                                                    <td style="padding: 8px 0; text-align: center;">${qty}</td>
-                                                    <td style="padding: 8px 0; text-align: right;">${lineTotal.toLocaleString()} FCFA</td>
-                                                </tr>
-                                            `;
+                                                                            <tr style="border-bottom: 1px dotted #eee;">
+                                                                                <td style="padding: 8px 0;">${prodName}</td>
+                                                                                <td style="padding: 8px 0; text-align: center;">${qty}</td>
+                                                                                <td style="padding: 8px 0; text-align: right;">${lineTotal.toLocaleString()} FCFA</td>
+                                                                            </tr>
+                                                                        `;
                                         }).join('')}
                                     </tbody>
                                     <tfoot>
@@ -1166,63 +1238,25 @@
                 confirmButtonText: 'Oui, annuler la vente',
                 cancelButtonText: 'Non, conserver',
                 showLoaderOnConfirm: true,
-                preConfirm: async () => {
-                    let isCurrentlyOnline = navigator.onLine;
-                    if (typeof checkActualConnection === 'function') {
-                        isCurrentlyOnline = await checkActualConnection();
-                    }
-
-                    const isElectron = typeof window.electronAPI !== 'undefined';
-                    const currentUserId = {{ auth()->id() ?? 'null' }};
-
-                    if (isElectron) {
-                        try {
-                            const localResult = await window.electronAPI.invoke('sqlite-refund-sale', {
-                                saleId: saleId,
-                                userId: currentUserId
-                            });
-                            if (!localResult.success) {
-                                throw new Error(localResult.message);
-                            }
-                            console.log("Vente annulée localement dans SQLite.");
-                        } catch (err) {
-                            console.error("Erreur remboursement SQLite :", err);
-                            Swal.showValidationMessage(`Erreur locale SQLite : ${err.message}`);
-                            return false;
-                        }
-                    }
-
-                    if (isCurrentlyOnline) {
-                        return fetch(`/employee/pos/sales/${saleId}/refund`, {
+                preConfirm: () => {
+                    return fetch(`/employee/pos/sales/${saleId}/refund`, {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
                                 'X-CSRF-TOKEN': '{{ csrf_token() }}'
                             }
                         })
-                            .then(response => {
-                                if (!response.ok) {
-                                    return response.json().then(err => {
-                                        throw new Error(err.message || response.statusText);
-                                    });
-                                }
-                                return response.json();
-                            })
-                            .catch(error => {
-                                if (isElectron) {
-                                    return { success: true, message: 'Vente annulée localement (sera synchronisée).' };
-                                }
-                                Swal.showValidationMessage(`Erreur: ${error.message || error}`);
-                                return false;
-                            });
-                    } else {
-                        if (isElectron) {
-                            return { success: true, message: 'Vente annulée localement (sera synchronisée).' };
-                        } else {
-                            Swal.showValidationMessage('Connexion internet requise pour annuler la vente.');
-                            return false;
-                        }
-                    }
+                        .then(response => {
+                            if (!response.ok) {
+                                return response.json().then(err => {
+                                    throw new Error(err.message || response.statusText);
+                                });
+                            }
+                            return response.json();
+                        })
+                        .catch(error => {
+                            Swal.showValidationMessage(`Erreur: ${error.message || error}`);
+                        });
                 }
             }).then((result) => {
                 if (result.isConfirmed && result.value.success) {
@@ -1259,12 +1293,12 @@
                 } catch (e) {
                     try {
                         if (instance.isScanning) await instance.stop();
-                    } catch (_) { }
+                    } catch (_) {}
                 }
 
                 try {
                     await instance.clear();
-                } catch (_) { }
+                } catch (_) {}
             }
 
             if (activeCameraStream) {
@@ -1291,7 +1325,7 @@
                 video.pause();
                 video.src = '';
                 video.load();
-            } catch (e) { }
+            } catch (e) {}
         }
 
         async function startScanner() {
@@ -1408,7 +1442,7 @@
                             return Promise.race([
                                 promise,
                                 new Promise((_, reject) => setTimeout(() => reject(
-                                    new Error(timeoutLabel)),
+                                        new Error(timeoutLabel)),
                                     timeoutMs))
                             ]);
                         };
@@ -1448,21 +1482,21 @@
                                         }
                                     };
                                 }
-                            } catch (_) { }
+                            } catch (_) {}
 
                             await withTimeout(
                                 html5QrCode.start(
                                     cameraConfig, {
-                                    fps: 12,
-                                    qrbox: {
-                                        width: 260,
-                                        height: 160
-                                    }
-                                },
+                                        fps: 12,
+                                        qrbox: {
+                                            width: 260,
+                                            height: 160
+                                        }
+                                    },
                                     (decodedText) => {
                                         onCodeDetected(decodedText);
                                     },
-                                    () => { }
+                                    () => {}
                                 ),
                                 8000,
                                 'StartScannerTimeout'
@@ -1472,7 +1506,7 @@
                                 '<i class="fa-solid fa-circle" style="color:#22c55e;font-size:10px;"></i> Caméra active — pointez vers un code-barres';
                             return true;
                         } catch (err) {
-                            stopScannerAsync().catch(() => { });
+                            stopScannerAsync().catch(() => {});
                             if (statusEl()) statusEl().innerHTML =
                                 `<span style="color:#f59e0b"><i class="fa-solid fa-triangle-exclamation"></i> <strong>Scanner desktop lent/bloqué.</strong><br><small style="color:#94a3b8">Bascule automatique vers le mode caméra...</small></span>`;
                             return false;
@@ -1505,18 +1539,18 @@
 
                             html5QrCode = new Html5Qrcode('reader');
                             html5QrCode.start({
-                                facingMode: 'environment'
-                            }, {
-                                fps: 12,
-                                qrbox: {
-                                    width: 260,
-                                    height: 160
-                                }
-                            },
+                                    facingMode: 'environment'
+                                }, {
+                                    fps: 12,
+                                    qrbox: {
+                                        width: 260,
+                                        height: 160
+                                    }
+                                },
                                 (decodedText) => {
                                     onCodeDetected(decodedText);
                                 },
-                                () => { }
+                                () => {}
                             ).then(() => {
                                 if (statusEl()) statusEl().innerHTML =
                                     '<i class="fa-solid fa-circle" style="color:#22c55e;font-size:10px;"></i> Caméra active — pointez vers un code-barres';
@@ -1561,7 +1595,7 @@
                                     if (barcodes.length > 0) {
                                         onCodeDetected(barcodes[0].rawValue);
                                     }
-                                } catch (e) { }
+                                } catch (e) {}
                             }
                             scanLoop = requestAnimationFrame(tick);
                         };
@@ -1570,36 +1604,36 @@
 
                     // Tentatives avec contraintes de plus en plus simples
                     const attempts = [{
-                        video: {
-                            width: {
-                                ideal: 1280
-                            },
-                            height: {
-                                ideal: 720
+                            video: {
+                                width: {
+                                    ideal: 1280
+                                },
+                                height: {
+                                    ideal: 720
+                                }
                             }
-                        }
-                    },
-                    {
-                        video: {
-                            width: 640,
-                            height: 480
-                        }
-                    },
-                    {
-                        video: {
-                            width: {
-                                min: 320,
-                                max: 640
-                            },
-                            height: {
-                                min: 240,
-                                max: 480
+                        },
+                        {
+                            video: {
+                                width: 640,
+                                height: 480
                             }
-                        }
-                    },
-                    {
-                        video: true
-                    } // contrainte minimale — dernier recours
+                        },
+                        {
+                            video: {
+                                width: {
+                                    min: 320,
+                                    max: 640
+                                },
+                                height: {
+                                    min: 240,
+                                    max: 480
+                                }
+                            }
+                        },
+                        {
+                            video: true
+                        } // contrainte minimale — dernier recours
                     ];
 
                     const getUserMediaWithTimeout = (constraints, timeoutMs = 5000) => {
@@ -1686,7 +1720,7 @@
                                     started = true;
                                     if (statusEl()) statusEl().innerHTML =
                                         '<i class="fa-solid fa-spinner fa-spin"></i> Caméra détectée, initialisation du scanner...';
-                                    video.play().catch(() => { });
+                                    video.play().catch(() => {});
                                     startScanLoop();
                                 };
 
@@ -1711,7 +1745,7 @@
                                     cleanupVideoStream(video);
                                     setTimeout(() => tryGetCamera(index + 1), 250);
                                 } else if (msg.includes('NotReadableError') || msg.includes(
-                                    'Could not start video source')) {
+                                        'Could not start video source')) {
                                     // Attendre 1500ms avec nettoyage complet avant nouvelle tentative
                                     cleanupVideoStream(video);
                                     setTimeout(() => tryGetCamera(index + 1), 1500);
@@ -1930,15 +1964,9 @@
         }
 
         // --- SESSION DE CAISSE ---
-        async function submitOpenSession(event) {
+        function submitOpenSession(event) {
             event.preventDefault();
-            const openingBalance = parseFloat(document.getElementById('opening_balance').value || 0);
-
-            const currentUserId = {{ auth()->id() ?? 'null' }};
-            if (!currentUserId) {
-                Swal.fire('Erreur d\'authentification', 'Utilisateur non identifié. Veuillez vous reconnecter.', 'error');
-                return;
-            }
+            const openingBalance = document.getElementById('opening_balance').value;
 
             Swal.fire({
                 title: 'Initialisation de la caisse...',
@@ -1948,36 +1976,7 @@
                 }
             });
 
-            // Détection de connexion
-            let isCurrentlyOnline = navigator.onLine;
-            if (typeof checkActualConnection === 'function') {
-                isCurrentlyOnline = await checkActualConnection();
-            }
-
-            const isElectron = typeof window.electronAPI !== 'undefined';
-
-            if (isElectron) {
-                // 1. Ouvrir localement dans SQLite pour pouvoir vendre hors-ligne
-                try {
-                    const localResult = await window.electronAPI.invoke('sqlite-open-session', {
-                        userId: currentUserId,
-                        openingBalance: openingBalance
-                    });
-                    
-                    if (!localResult.success && !localResult.message.includes("déjà active")) {
-                        throw new Error(localResult.message);
-                    }
-                    console.log("Session ouverte localement dans SQLite :", localResult);
-                } catch (err) {
-                    console.error("Erreur d'ouverture locale SQLite :", err);
-                    Swal.fire('Erreur Locale !', 'Impossible d\'ouvrir la caisse localement dans SQLite : ' + err.message, 'error');
-                    return;
-                }
-            }
-
-            // 2. Si en ligne, ouvrir aussi sur le serveur MySQL
-            if (isCurrentlyOnline) {
-                fetch('{{ route('employee.pos.session.open') }}', {
+            fetch('{{ route('employee.pos.session.open') }}', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -1987,74 +1986,30 @@
                         opening_balance: openingBalance
                     })
                 })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.success || (data.message && data.message.includes("déjà active"))) {
-                            Swal.fire('Succès !', data.message || 'Caisse ouverte avec succès.', 'success').then(() => {
-                                location.reload();
-                            });
-                        } else {
-                            Swal.fire('Erreur !', data.message, 'error');
-                        }
-                    })
-                    .catch(error => {
-                        console.error("Erreur serveur openSession:", error);
-                        if (isElectron) {
-                            const gate = document.getElementById('session-gate');
-                            const closeBtn = document.getElementById('close-session-btn');
-                            if (gate) gate.style.display = 'none';
-                            if (closeBtn) closeBtn.style.display = 'flex';
-                            Swal.fire('Mode Hors-ligne activé', 'La caisse est ouverte localement. Les données seront synchronisées ultérieurement.', 'info');
-                        } else {
-                            Swal.fire('Erreur !', 'Une erreur est survenue lors de l\'ouverture de caisse sur le serveur.', 'error');
-                        }
-                    });
-            } else {
-                // Si hors-ligne
-                if (isElectron) {
-                    const gate = document.getElementById('session-gate');
-                    const closeBtn = document.getElementById('close-session-btn');
-                    if (gate) gate.style.display = 'none';
-                    if (closeBtn) closeBtn.style.display = 'flex';
-                    Swal.fire('Mode Hors-ligne', 'Caisse ouverte localement. Les ventes seront synchronisées au retour de la connexion.', 'success');
-                } else {
-                    Swal.fire('Hors-ligne', 'Connexion internet requise pour ouvrir la caisse.', 'error');
-                }
-            }
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        Swal.fire('Succès!', data.message, 'success').then(() => {
+                            location.reload();
+                        });
+                    } else {
+                        Swal.fire('Erreur!', data.message, 'error');
+                    }
+                })
+                .catch(error => {
+                    Swal.fire('Erreur!', 'Une erreur est survenue lors de l\'ouverture de caisse.', 'error');
+                });
         }
 
-        async function showCloseSessionModal() {
-            let expected = {{ $expectedClosingBalance ?? 0 }};
-            let openingBalance = {{ $activeSession->opening_balance ?? 0 }};
-            let totalSales = {{ (($expectedClosingBalance ?? 0) - ($activeSession->opening_balance ?? 0)) }};
-            
-            const isElectron = typeof window.electronAPI !== 'undefined';
-            const currentUserId = {{ auth()->id() ?? 'null' }};
-            let localSessionId = null;
-
-            if (isElectron) {
-                try {
-                    const localSession = await window.electronAPI.invoke('sqlite-get-active-session', currentUserId);
-                    if (localSession) {
-                        localSessionId = localSession.id;
-                        const localSummary = await window.electronAPI.invoke('sqlite-get-session-expected-balance', localSessionId);
-                        if (localSummary.success) {
-                            openingBalance = localSummary.openingBalance;
-                            totalSales = localSummary.totalSales;
-                            expected = localSummary.expectedClosingBalance;
-                        }
-                    }
-                } catch (e) {
-                    console.error("Erreur de calcul du solde attendu SQLite:", e);
-                }
-            }
+        function showCloseSessionModal() {
+            const expected = {{ $expectedClosingBalance ?? 0 }};
 
             Swal.fire({
                 title: 'Clôture de la caisse',
                 html: `
                             <div style="text-align: left; font-size: 14px;">
-                                <p style="margin-bottom: 8px;">Fond initial : <b>${openingBalance.toLocaleString()} FCFA</b></p>
-                                <p style="margin-bottom: 15px;">Ventes enregistrées : <b>${totalSales.toLocaleString()} FCFA</b></p>
+                                <p style="margin-bottom: 8px;">Fond initial : <b>{{ number_format($activeSession->opening_balance ?? 0, 0, ',', ' ') }} FCFA</b></p>
+                                <p style="margin-bottom: 15px;">Ventes enregistrées : <b>{{ number_format(($expectedClosingBalance ?? 0) - ($activeSession->opening_balance ?? 0), 0, ',', ' ') }} FCFA</b></p>
                                 <div style="border-top: 1px solid #eee; margin: 15px 0; padding-top: 15px;">
                                     <span style="font-size: 16px; font-weight: bold; color: var(--primary);">Total attendu en caisse : <b>${expected.toLocaleString()} FCFA</b></span>
                                 </div>
@@ -2077,7 +2032,7 @@
                     }
                     return actual;
                 }
-            }).then(async (result) => {
+            }).then((result) => {
                 if (result.isConfirmed) {
                     const actualBalance = result.value;
 
@@ -2089,34 +2044,7 @@
                         }
                     });
 
-                    // Détection de connexion
-                    let isCurrentlyOnline = navigator.onLine;
-                    if (typeof checkActualConnection === 'function') {
-                        isCurrentlyOnline = await checkActualConnection();
-                    }
-
-                    const isElectron = typeof window.electronAPI !== 'undefined';
-                    const currentUserId = {{ auth()->id() ?? 'null' }};
-
-                    if (isElectron) {
-                        try {
-                            const localResult = await window.electronAPI.invoke('sqlite-close-session', {
-                                userId: currentUserId,
-                                actualClosingBalance: parseFloat(actualBalance)
-                            });
-                            if (!localResult.success) {
-                                throw new Error(localResult.message);
-                            }
-                            console.log("Session fermée localement dans SQLite :", localResult);
-                        } catch (err) {
-                            console.error("Erreur de fermeture locale SQLite :", err);
-                            Swal.fire('Erreur Locale !', 'Impossible de clôturer la caisse localement dans SQLite : ' + err.message, 'error');
-                            return;
-                        }
-                    }
-
-                    if (isCurrentlyOnline) {
-                        fetch('{{ route('employee.pos.session.close') }}', {
+                    fetch('{{ route('employee.pos.session.close') }}', {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
@@ -2126,65 +2054,66 @@
                                 actual_closing_balance: actualBalance
                             })
                         })
-                            .then(response => response.json())
-                            .then(data => {
-                                if (data.success) {
-                                    const session = data.session;
-                                    const diff = parseFloat(session.difference);
-                                    let diffText = '';
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.success) {
+                                const session = data.session;
+                                const diff = parseFloat(session.difference);
+                                let diffText = '';
 
-                                    if (diff === 0) {
-                                        diffText =
-                                            '<span style="color: green; font-weight: bold;">Caisse équilibrée (0 FCFA d\'écart)</span>';
-                                    } else if (diff > 0) {
-                                        diffText =
-                                            `<span style="color: blue; font-weight: bold;">Excédent de caisse de +${diff.toLocaleString()} FCFA</span>`;
-                                    } else {
-                                        diffText =
-                                            `<span style="color: red; font-weight: bold;">Déficit de caisse de ${diff.toLocaleString()} FCFA</span>`;
-                                    }
+                                if (diff === 0) {
+                                    diffText =
+                                        '<span style="color: green; font-weight: bold;">Caisse équilibrée (0 FCFA d\'écart)</span>';
+                                } else if (diff > 0) {
+                                    diffText =
+                                        `<span style="color: blue; font-weight: bold;">Excédent de caisse de +${diff.toLocaleString()} FCFA</span>`;
+                                } else {
+                                    diffText =
+                                        `<span style="color: red; font-weight: bold;">Déficit de caisse de ${diff.toLocaleString()} FCFA</span>`;
+                                }
 
-                                    Swal.fire({
-                                        title: 'Caisse clôturée !',
-                                        html: `
-                                                <div style="text-align: left; font-size: 14px;">
-                                                    <p>Attendu : <b>${parseFloat(session.expected_closing_balance).toLocaleString()} FCFA</b></p>
-                                                    <p>Compté : <b>${parseFloat(session.actual_closing_balance).toLocaleString()} FCFA</b></p>
-                                                    <p style="margin-top:10px;">Résultat : ${diffText}</p>
-                                                </div>
-                                            `,
-                                        icon: 'success'
-                                    }).then(() => {
-                                        location.reload();
-                                    });
-                                } else {
-                                    Swal.fire('Erreur !', data.message, 'error');
-                                }
-                            })
-                            .catch(error => {
-                                console.error("Erreur serveur closeSession:", error);
-                                if (isElectron) {
-                                    Swal.fire('Clôture locale enregistrée', 'La clôture a été enregistrée localement dans SQLite. Elle sera synchronisée au retour de la connexion.', 'info').then(() => {
-                                        location.reload();
-                                    });
-                                } else {
-                                    Swal.fire('Erreur !', 'Une erreur est survenue lors de la clôture sur le serveur.', 'error');
-                                }
-                            });
-                    } else {
-                        // Hors-ligne
-                        if (isElectron) {
-                            Swal.fire({
-                                title: 'Caisse clôturée (Hors-ligne) !',
-                                text: 'La clôture a été enregistrée localement et sera synchronisée lors de la prochaine connexion.',
-                                icon: 'success'
-                            }).then(() => {
-                                location.reload();
-                            });
-                        } else {
-                            Swal.fire('Hors-ligne', 'Connexion internet requise pour clôturer la caisse.', 'error');
-                        }
-                    }
+                                Swal.fire({
+                                    title: 'Caisse clôturée !',
+                                    html: `
+                                            <div style="text-align: left; font-size: 14px;">
+                                                <p>Attendu : <b>${parseFloat(session.expected_closing_balance).toLocaleString()} FCFA</b></p>
+                                                <p>Compté : <b>${parseFloat(session.actual_closing_balance).toLocaleString()} FCFA</b></p>
+                                                <p style="margin-top:10px;">Résultat : ${diffText}</p>
+                                            </div>
+                                        `,
+                                    icon: 'success',
+                                    timer: 3000,
+                                    timerProgressBar: true,
+                                    showConfirmButton: true
+                                }).then(() => {
+                                    // Soumettre le formulaire de déconnexion globale directement pour rediriger vers le login
+                                    const logoutForm = document.createElement('form');
+                                    logoutForm.method = 'POST';
+                                    logoutForm.action = '{{ route('logout') }}';
+                                    logoutForm.style.display = 'none';
+
+                                    const csrfInput = document.createElement('input');
+                                    csrfInput.type = 'hidden';
+                                    csrfInput.name = '_token';
+                                    csrfInput.value = '{{ csrf_token() }}';
+                                    logoutForm.appendChild(csrfInput);
+
+                                    const methodInput = document.createElement('input');
+                                    methodInput.type = 'hidden';
+                                    methodInput.name = '_method';
+                                    methodInput.value = 'DELETE';
+                                    logoutForm.appendChild(methodInput);
+
+                                    document.body.appendChild(logoutForm);
+                                    logoutForm.submit();
+                                });
+                            } else {
+                                Swal.fire('Erreur!', data.message, 'error');
+                            }
+                        })
+                        .catch(error => {
+                            Swal.fire('Erreur!', 'Une erreur est survenue lors de la clôture.', 'error');
+                        });
                 }
             });
         }
@@ -2235,7 +2164,7 @@
                         address
                     };
                 }
-            }).then(async (result) => {
+            }).then((result) => {
                 if (result.isConfirmed) {
                     Swal.fire({
                         title: 'Enregistrement en cours...',
@@ -2245,33 +2174,7 @@
                         }
                     });
 
-                    // Détection de connexion
-                    let isCurrentlyOnline = navigator.onLine;
-                    if (typeof checkActualConnection === 'function') {
-                        isCurrentlyOnline = await checkActualConnection();
-                    }
-
-                    const isElectron = typeof window.electronAPI !== 'undefined';
-                    let localCustomer = null;
-
-                    if (isElectron) {
-                        try {
-                            const localResult = await window.electronAPI.invoke('sqlite-create-customer', result.value);
-                            if (localResult.success) {
-                                localCustomer = localResult.customer;
-                                console.log("Client créé localement dans SQLite :", localCustomer);
-                            } else {
-                                throw new Error(localResult.message);
-                            }
-                        } catch (err) {
-                            console.error("Erreur création client SQLite :", err);
-                            Swal.fire('Erreur Locale !', 'Impossible de créer le client localement dans SQLite : ' + err.message, 'error');
-                            return;
-                        }
-                    }
-
-                    if (isCurrentlyOnline) {
-                        fetch('{{ route('employee.customers.store') }}', {
+                    fetch('{{ route('employee.customers.store') }}', {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
@@ -2279,53 +2182,26 @@
                             },
                             body: JSON.stringify(result.value)
                         })
-                            .then(response => response.json())
-                            .then(data => {
-                                if (data.success) {
-                                    const c = data.customer;
-                                    // Ajouter l'option au select et la sélectionner
-                                    const select = document.getElementById('cart-customer-id');
-                                    const option = document.createElement('option');
-                                    option.value = c.id;
-                                    option.text = `${c.name} ${c.phone ? '(' + c.phone + ')' : ''}`;
-                                    select.add(option);
-                                    select.value = c.id;
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.success) {
+                                const c = data.customer;
+                                // Ajouter l'option au select et la sélectionner
+                                const select = document.getElementById('cart-customer-id');
+                                const option = document.createElement('option');
+                                option.value = c.id;
+                                option.text = `${c.name} ${c.phone ? '(' + c.phone + ')' : ''}`;
+                                select.add(option);
+                                select.value = c.id;
 
-                                    Swal.fire('Succès !', data.message, 'success');
-                                } else {
-                                    Swal.fire('Erreur !', data.message, 'error');
-                                }
-                            })
-                            .catch(error => {
-                                console.error("Erreur serveur storeCustomer:", error);
-                                if (localCustomer) {
-                                    const select = document.getElementById('cart-customer-id');
-                                    const option = document.createElement('option');
-                                    option.value = localCustomer.id;
-                                    option.text = `${localCustomer.name} ${localCustomer.phone ? '(' + localCustomer.phone + ')' : ''}`;
-                                    select.add(option);
-                                    select.value = localCustomer.id;
-
-                                    Swal.fire('Créé localement', 'Client créé localement (hors-ligne). Il sera synchronisé.', 'success');
-                                } else {
-                                    Swal.fire('Erreur !', 'Impossible d\'enregistrer le client.', 'error');
-                                }
-                            });
-                    } else {
-                        // Hors-ligne
-                        if (localCustomer) {
-                            const select = document.getElementById('cart-customer-id');
-                            const option = document.createElement('option');
-                            option.value = localCustomer.id;
-                            option.text = `${localCustomer.name} ${localCustomer.phone ? '(' + localCustomer.phone + ')' : ''}`;
-                            select.add(option);
-                            select.value = localCustomer.id;
-
-                            Swal.fire('Créé localement', 'Client créé localement (hors-ligne). Il sera synchronisé.', 'success');
-                        } else {
-                            Swal.fire('Hors-ligne', 'Connexion internet requise pour enregistrer le client.', 'error');
-                        }
-                    }
+                                Swal.fire('Succès!', data.message, 'success');
+                            } else {
+                                Swal.fire('Erreur!', data.message, 'error');
+                            }
+                        })
+                        .catch(error => {
+                            Swal.fire('Erreur!', 'Impossible d\'enregistrer le client.', 'error');
+                        });
                 }
             });
         }
@@ -2456,7 +2332,7 @@
             });
         }
 
-        window.restoreHeldCart = function (id) {
+        window.restoreHeldCart = function(id) {
             const heldCarts = getHeldCarts();
             const hcIndex = heldCarts.findIndex(c => c.id === id);
 
@@ -2522,7 +2398,7 @@
             Swal.fire('Restauré!', `Panier "${hc.name}" rechargé avec succès.`, 'success');
         }
 
-        window.deleteHeldCart = function (id) {
+        window.deleteHeldCart = function(id) {
             Swal.fire({
                 title: 'Supprimer ce panier suspendu ?',
                 text: 'Cette action est irréversible.',
@@ -2545,30 +2421,8 @@
         };
 
         // Appeler updateHeldCartsCount et masquer le loader
-        document.addEventListener('DOMContentLoaded', async () => {
+        document.addEventListener('DOMContentLoaded', () => {
             updateHeldCartsCount();
-
-            // Gestion dynamique de l'état de session sous Electron
-            const isElectron = typeof window.electronAPI !== 'undefined';
-            if (isElectron) {
-                try {
-                    const currentUserId = {{ auth()->id() ?? 'null' }};
-                    const localSession = await window.electronAPI.invoke('sqlite-get-active-session', currentUserId);
-                    
-                    const gate = document.getElementById('session-gate');
-                    const closeBtn = document.getElementById('close-session-btn');
-                    
-                    if (localSession) {
-                        if (gate) gate.style.display = 'none';
-                        if (closeBtn) closeBtn.style.display = 'flex';
-                    } else {
-                        if (gate) gate.style.display = 'flex';
-                        if (closeBtn) closeBtn.style.display = 'none';
-                    }
-                } catch (e) {
-                    console.error("Erreur check session active SQLite au chargement:", e);
-                }
-            }
         });
 
         function submitProfileUpdate(event) {
@@ -2593,13 +2447,13 @@
             });
 
             fetch('{{ route('employee.profile.update') }}', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': '{{ csrf_token() }}'
-                },
-                body: JSON.stringify(data)
-            })
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                    },
+                    body: JSON.stringify(data)
+                })
                 .then(response => {
                     if (!response.ok) {
                         return response.json().then(err => {

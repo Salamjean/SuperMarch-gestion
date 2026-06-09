@@ -15,7 +15,8 @@ class DebtPayment extends Model
         'cash_session_id',
         'amount',
         'reference',
-        'payment_method'
+        'payment_method',
+        'synced'
     ];
 
     public function customer()

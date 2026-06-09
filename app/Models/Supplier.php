@@ -16,6 +16,7 @@ class Supplier extends Model
         'website',
         'is_active',
         'notes',
+        'synced',
     ];
 
     protected $casts = [

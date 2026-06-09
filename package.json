@@ -4,7 +4,7 @@
     "type": "module",
     "scripts": {
         "build": "vite build",
-        "dev": "concurrently \"php artisan serve\" \"vite\" \"electron .\"",
+        "dev": "concurrently \"vite\" \"electron .\"",
         "start": "electron .",
         "pack": "electron-builder --dir",
         "dist": "electron-builder"
@@ -23,6 +23,7 @@
     "version": "1.0.0",
     "main": "main.js",
     "build": {
+        "asar": false,
         "appId": "com.appmobile.pos",
         "productName": "SuperMarche",
         "directories": {

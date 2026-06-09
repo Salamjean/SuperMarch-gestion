@@ -705,19 +705,19 @@
             btn.closest('.sidebar-dropdown').classList.toggle('open');
         }
 
-        document.addEventListener('DOMContentLoaded', function () {
+        document.addEventListener('DOMContentLoaded', function() {
             const sidebar = document.getElementById('sidebar');
             const sidebarToggle = document.getElementById('sidebarToggle');
             const sidebarOverlay = document.getElementById('sidebarOverlay');
 
             if (sidebarToggle && sidebar && sidebarOverlay) {
-                sidebarToggle.addEventListener('click', function (e) {
+                sidebarToggle.addEventListener('click', function(e) {
                     e.stopPropagation();
                     sidebar.classList.toggle('open');
                     sidebarOverlay.classList.toggle('open');
                 });
 
-                sidebarOverlay.addEventListener('click', function () {
+                sidebarOverlay.addEventListener('click', function() {
                     sidebar.classList.remove('open');
                     sidebarOverlay.classList.remove('open');
                 });
@@ -725,48 +725,200 @@
         });
 
         // ════════════════════════════════════════════════════════════════════════
-        //  SYNC MANAGER — SQLite ↔ MySQL (Admin Pull)
+        //  SYNC MANAGER — SQLite ↔ MySQL (Admin Sync & PUSH)
         // ════════════════════════════════════════════════════════════════════════
         const isElectron = typeof window.electronAPI !== 'undefined';
-        const BASE_URL = window.location.origin;
 
         async function checkActualConnection() {
-            if (!navigator.onLine) return false;
             try {
                 const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 1500);
-                await fetch('https://1.1.1.1', { method: 'GET', mode: 'no-cors', cache: 'no-store', signal: controller.signal });
+                const timeoutId = setTimeout(() => controller.abort(), 2000);
+                const response = await fetch('{{ route('local.sync.check-mysql') }}', {
+                    method: 'GET',
+                    cache: 'no-store',
+                    signal: controller.signal
+                });
                 clearTimeout(timeoutId);
-                return true;
+                if (!response.ok) return false;
+                const data = await response.json();
+                return data.success === true;
             } catch (e) {
                 return false;
             }
         }
 
-        async function pullFromServer() {
-            if (!isElectron) return;
-            try {
-                console.log('📥 Pull depuis le serveur...');
-                const result = await window.electronAPI.invoke('sqlite-pull', {
-                    baseUrl: BASE_URL,
-                    sessionCookie: document.cookie
-                });
-                if (result.success) {
-                    console.log('✅ Pull réussi :', result.stats);
-                } else {
-                    console.warn('⚠️ Pull échoué :', result.message);
+        let _isOnline = true;
+
+        async function updateConnectionPill() {
+            const pill = document.getElementById('connection-status-pill');
+            const icon = document.getElementById('connection-status-icon');
+            const text = document.getElementById('connection-status-text');
+
+            const wasOnline = _isOnline;
+            _isOnline = await checkActualConnection();
+
+            if (_isOnline) {
+                if (pill) {
+                    pill.style.background = '#059669';
+                    pill.style.borderColor = 'rgba(255,255,255,0.2)';
                 }
+                if (icon) icon.className = 'fa-solid fa-wifi';
+                if (text) text.textContent = 'EN LIGNE';
+                if (!wasOnline) {
+                    console.log('🌐 Connexion rétablie → synchronisation automatique...');
+                    setTimeout(() => checkAndSyncOffline(false), 2000);
+                }
+            } else {
+                if (pill) {
+                    pill.style.background = '#dc2626';
+                    pill.style.borderColor = 'rgba(255,255,255,0.3)';
+                }
+                if (icon) icon.className = 'fa-solid fa-wifi-slash';
+                if (text) text.textContent = 'HORS-LIGNE';
+            }
+
+            await updatePendingCount();
+        }
+
+        async function updatePendingCount() {
+            try {
+                const response = await fetch('{{ route('local.sync.pending-count') }}');
+                const data = await response.json();
+                const count = data.count || 0;
+
+                const countEl = document.getElementById('sync-pending-count');
+                const syncBtn = document.getElementById('btn-manual-sync');
+                if (countEl) countEl.textContent = count;
+                if (syncBtn) syncBtn.style.display = (count > 0 && _isOnline) ? 'flex' : 'none';
             } catch (e) {
-                console.error('Erreur pull:', e);
+                // Ignore local failures
             }
         }
 
+        let isSyncing = false;
+
+        async function checkAndSyncOffline(isManual = false) {
+            if (isSyncing) return;
+            if (!_isOnline) {
+                if (isManual) Swal.fire('Hors-ligne', 'Impossible de synchroniser sans connexion internet.', 'warning');
+                return;
+            }
+
+            isSyncing = true;
+            const syncIcon = document.getElementById('sync-icon');
+            if (syncIcon) syncIcon.classList.add('fa-spin');
+
+            try {
+                const response = await fetch('{{ route('local.sync.push') }}', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!response.ok) throw new Error('Erreur HTTP ' + response.status);
+                const result = await response.json();
+
+                if (result.success) {
+                    if (result.synced_count > 0 && isManual) {
+                        Swal.fire({
+                            title: 'Synchronisation réussie !',
+                            text: `${result.synced_count} opération(s) synchronisée(s) avec le serveur.`,
+                            icon: 'success',
+                            timer: 2500,
+                            showConfirmButton: false
+                        });
+                    } else if (result.synced_count === 0 && isManual) {
+                        Swal.fire('Synchronisation', 'Aucune donnée hors-ligne à synchroniser.', 'info');
+                    }
+                } else {
+                    throw new Error(result.message || 'Erreur inconnue');
+                }
+            } catch (err) {
+                console.error('Erreur sync push:', err);
+                if (isManual) Swal.fire('Erreur', 'La synchronisation a échoué. Réessayez plus tard.', 'error');
+            } finally {
+                isSyncing = false;
+                if (syncIcon) syncIcon.classList.remove('fa-spin');
+                await updatePendingCount();
+            }
+        }
+
+        async function pullFromServer(isManual = false) {
+            if (!_isOnline) {
+                if (isManual) Swal.fire('Hors-ligne', 'Impossible de télécharger sans connexion internet.', 'warning');
+                return;
+            }
+
+            const syncIcon = document.getElementById('sync-icon');
+            if (syncIcon) syncIcon.classList.add('fa-spin');
+
+            try {
+                if (isManual) {
+                    Swal.fire({
+                        title: 'Téléchargement...',
+                        text: 'Mise à jour des données depuis le serveur en ligne',
+                        allowOutsideClick: false,
+                        didOpen: () => {
+                            Swal.showLoading();
+                        }
+                    });
+                }
+
+                const response = await fetch('{{ route('local.sync.pull') }}', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!response.ok) throw new Error('Erreur HTTP ' + response.status);
+                const result = await response.json();
+
+                if (result.success) {
+                    if (isManual) {
+                        Swal.fire({
+                            title: 'Téléchargement réussi !',
+                            text: 'La base de données locale a été mise à jour.',
+                            icon: 'success',
+                            timer: 2000,
+                            showConfirmButton: false
+                        }).then(() => location.reload());
+                    }
+                } else {
+                    throw new Error(result.message || 'Erreur inconnue');
+                }
+            } catch (err) {
+                console.error('Erreur sync pull:', err);
+                if (isManual) Swal.fire('Erreur', 'Le téléchargement a échoué. Réessayez plus tard.', 'error');
+            } finally {
+                if (syncIcon) syncIcon.classList.remove('fa-spin');
+            }
+        }
+
+        function triggerManualSync(showFeedback = true) {
+            checkAndSyncOffline(showFeedback);
+        }
+
+        window.addEventListener('online', () => updateConnectionPill());
+        window.addEventListener('offline', () => updateConnectionPill());
+        setInterval(() => updateConnectionPill(), 10000); // Ping toutes les 10s
+        setInterval(() => {
+            if (_isOnline) checkAndSyncOffline();
+        }, 60000); // Auto-push toutes les 60s
+
         document.addEventListener('DOMContentLoaded', async () => {
-            const isOnline = await checkActualConnection();
-            const isLocalServer = BASE_URL.includes('127.0.0.1') || BASE_URL.includes('localhost');
-            if (isElectron && (isOnline || isLocalServer)) {
+            await updateConnectionPill();
+
+            if (_isOnline) {
+                // Déclencher un push rapide automatique au chargement pour synchroniser l'action précédente
+                console.log('🚀 Synchronisation automatique au chargement...');
+                setTimeout(() => checkAndSyncOffline(false), 1500);
+
                 console.log('🚀 Pull initial des données au démarrage de la session admin...');
-                await pullFromServer();
+                pullFromServer(false);
             }
         });
     </script>

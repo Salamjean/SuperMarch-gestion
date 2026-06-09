@@ -15,7 +15,8 @@ class Customer extends Model
         'email',
         'address',
         'debt_balance',
-        'is_credit_blocked'
+        'is_credit_blocked',
+        'synced'
     ];
 
     protected $casts = [

@@ -567,4 +567,13 @@ class EmployeeDashboardController extends Controller
             ], 500);
         }
     }
+
+    public function getProductsStock()
+    {
+        $products = Product::where('is_active', true)->select('id', 'stock', 'stock_threshold')->get();
+        return response()->json([
+            'success' => true,
+            'products' => $products
+        ]);
+    }
 }

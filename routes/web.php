@@ -66,6 +66,7 @@ Route::prefix('admin')->name('admin.')->middleware('admin')->group(function () {
 // Employee protected routes
 Route::prefix('employee')->name('employee.')->middleware('employee')->group(function () {
     Route::get('/dashboard', [EmployeeDashboardController::class, 'index'])->name('dashboard');
+    Route::get('/pos/products-stock', [EmployeeDashboardController::class, 'getProductsStock'])->name('pos.products-stock');
     Route::post('/pos/checkout', [EmployeeDashboardController::class, 'checkout'])->name('pos.checkout');
     Route::post('/pos/sync', [EmployeeDashboardController::class, 'syncSales'])->name('pos.sync');
     Route::post('/stock/request', [EmployeeDashboardController::class, 'requestRestock'])->name('stock.request');
@@ -109,3 +110,9 @@ Route::prefix('magasinier')->name('magasinier.')->middleware('magasinier')->grou
     Route::get('/profile', [MagasinierDashboardController::class, 'showProfile'])->name('profile.show');
     Route::post('/profile/update', [MagasinierDashboardController::class, 'updateProfile'])->name('profile.update');
 });
+
+// Routes locales de synchronisation (tournent uniquement en local)
+Route::post('/local/sync/push', [\App\Http\Controllers\Local\LocalSyncController::class, 'pushPending'])->name('local.sync.push');
+Route::post('/local/sync/pull', [\App\Http\Controllers\Local\LocalSyncController::class, 'pullUpdates'])->name('local.sync.pull');
+Route::get('/local/sync/pending-count', [\App\Http\Controllers\Local\LocalSyncController::class, 'getPendingCount'])->name('local.sync.pending-count');
+Route::get('/local/sync/check-mysql', [\App\Http\Controllers\Local\LocalSyncController::class, 'checkMysqlConnection'])->name('local.sync.check-mysql');

@@ -10,14 +10,15 @@ class CashSession extends Model
     use HasFactory;
 
     protected $fillable = [
-        'user_id', 
-        'opening_balance', 
-        'expected_closing_balance', 
-        'actual_closing_balance', 
-        'difference', 
-        'opened_at', 
-        'closed_at', 
-        'status'
+        'user_id',
+        'opening_balance',
+        'expected_closing_balance',
+        'actual_closing_balance',
+        'difference',
+        'opened_at',
+        'closed_at',
+        'status',
+        'synced'
     ];
 
     protected $casts = [

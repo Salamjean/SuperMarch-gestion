@@ -11,7 +11,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Notifications\Notifiable;
 
-#[Fillable(['name', 'email', 'login_code', 'password', 'role', 'phone', 'position', 'department', 'hire_date', 'address', 'gender'])]
+#[Fillable(['name', 'email', 'login_code', 'password', 'role', 'phone', 'position', 'department', 'hire_date', 'address', 'gender', 'synced'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -25,7 +25,7 @@ class User extends Authenticatable
         static::creating(function ($user) {
             if (empty($user->login_code)) {
                 $prefix = $user->role === 'admin' ? 'ADM' : 'EMP';
-                
+
                 // Trouve le dernier utilisateur avec ce préfixe pour calculer le numéro suivant
                 $latestUser = self::where('login_code', 'like', $prefix . '-%')
                     ->orderBy('id', 'desc')

@@ -15,6 +15,7 @@ class RestockRequest extends Model
         'status',
         'initial_stock',
         'added_stock',
+        'synced',
     ];
 
     public function product()

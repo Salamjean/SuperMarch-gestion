@@ -3,33 +3,113 @@ import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
 import { DatabaseSync } from "node:sqlite";
+import { spawn, execSync } from "child_process";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+let phpProcess = null;
+
 // ─── Configuration ────────────────────────────────────────────────────────────
-const REMOTE_BASE_URL = "https://fescads.com";
-const LOCAL_DEV_URL   = "http://127.0.0.1:8000";
+const REMOTE_BASE_URL = "http://127.0.0.1:8000";
+const LOCAL_DEV_URL = "http://127.0.0.1:8000";
 // Clé API partagée avec Laravel pour sécuriser /api/sync/*
-const SYNC_API_KEY    = "supermarche-sync-secret-2026";
+const SYNC_API_KEY = "supermarche-sync-secret-2026";
 
 // ─── Permissions caméra / micro ───────────────────────────────────────────────
 function setupPermissions() {
     session.defaultSession.setPermissionRequestHandler(
         (webContents, permission, callback) => {
-            const allowed = ["media", "camera", "microphone", "videoCapture", "audioCapture"];
+            const allowed = [
+                "media",
+                "camera",
+                "microphone",
+                "videoCapture",
+                "audioCapture",
+            ];
             callback(allowed.includes(permission));
         },
     );
     session.defaultSession.setPermissionCheckHandler(
         (webContents, permission) => {
-            const allowed = ["media", "camera", "microphone", "videoCapture", "audioCapture"];
+            const allowed = [
+                "media",
+                "camera",
+                "microphone",
+                "videoCapture",
+                "audioCapture",
+            ];
             return allowed.includes(permission);
         },
     );
     session.defaultSession.setDevicePermissionHandler((details) => {
-        if (details.deviceType === "hid" || details.deviceType === "serial") return false;
+        if (details.deviceType === "hid" || details.deviceType === "serial")
+            return false;
         return true;
+    });
+}
+
+function startLocalPhpServer() {
+    return new Promise((resolve) => {
+        // Chemin vers le fichier artisan
+        const artisanPath = app.isPackaged
+            ? path.join(process.resourcesPath, "app", "artisan")
+            : path.join(__dirname, "artisan");
+
+        const workingDir = path.dirname(artisanPath);
+
+        console.log(
+            "Lancement du serveur PHP local de secours sur SQLite :",
+            artisanPath,
+        );
+        console.log("Dossier de travail PHP local :", workingDir);
+
+        // Détecter le répertoire d'extensions PHP sous Windows
+        const phpArgs = [];
+        try {
+            const phpPath = execSync("where php")
+                .toString()
+                .trim()
+                .split("\r\n")[0];
+            if (phpPath) {
+                const extDir = path.join(path.dirname(phpPath), "ext");
+                if (fs.existsSync(extDir)) {
+                    // Entourer de guillemets pour gérer les espaces sous Windows (ex: "Program Files")
+                    phpArgs.push("-d", `extension_dir="${extDir}"`);
+                    console.log("Dossier d'extensions PHP détecté :", extDir);
+                }
+            }
+        } catch (e) {
+            console.error(
+                "Erreur de détection dynamique du répertoire ext de PHP :",
+                e,
+            );
+        }
+
+        // Utiliser les noms d'extension Windows complets (DLL) par sécurité
+        phpArgs.push("-d", "extension=php_pdo_sqlite.dll");
+        phpArgs.push("-d", "extension=php_sqlite3.dll");
+        phpArgs.push("artisan"); // Relatif au cwd défini ci-dessous
+        phpArgs.push("serve");
+        phpArgs.push("--port=8000");
+
+        // Lancement du serveur PHP local en arrière-plan avec le bon répertoire de travail (cwd)
+        phpProcess = spawn("php", phpArgs, {
+            cwd: workingDir,
+            detached: false,
+            stdio: "ignore",
+        });
+
+        phpProcess.on("error", (err) => {
+            console.error("Impossible de démarrer le serveur PHP local :", err);
+            resolve(false);
+        });
+
+        // Laisser un peu de temps pour s'initialiser
+        setTimeout(() => {
+            console.log("Serveur PHP local démarré en arrière-plan.");
+            resolve(true);
+        }, 1500);
     });
 }
 
@@ -57,33 +137,23 @@ function createWindow() {
     // Charger immédiatement le splash screen local (affichage instantané)
     win.loadFile(path.join(__dirname, "public", "loading.html"));
 
-    // Vérification asynchrone de la connexion après l'affichage du splash screen
+    // Redirection vers le serveur local (avec ou sans connexion) après le splash screen
     setTimeout(async () => {
-        try {
-            // Test de ping rapide vers la route API du serveur en ligne fescads.com
-            const onlineCheck = await fetch(`${REMOTE_BASE_URL}/api/sync/ping`);
-            if (onlineCheck.ok) {
-                console.log("Connexion internet active. Chargement de fescads.com...");
-                win.loadURL(REMOTE_BASE_URL);
-                return;
-            }
-        } catch (e) {
-            console.log("Erreur ping distant au démarrage (mode offline probable) :", e.message);
-        }
-
-        // Si hors-ligne, attendre que le serveur local réponde (jusqu'à 15 secondes)
         console.log("Tentative de redirection vers le serveur local...");
         for (let attempt = 1; attempt <= 30; attempt++) {
             try {
                 const response = await fetch(LOCAL_DEV_URL);
                 if (response) {
-                    console.log(`Serveur local détecté (tentative ${attempt}). Redirection vers`, LOCAL_DEV_URL);
+                    console.log(
+                        `Serveur local détecté (tentative ${attempt}). Redirection vers`,
+                        LOCAL_DEV_URL,
+                    );
                     win.loadURL(LOCAL_DEV_URL);
                     return;
                 }
             } catch (err) {
                 // Attendre 500ms avant la prochaine tentative
-                await new Promise(resolve => setTimeout(resolve, 500));
+                await new Promise((resolve) => setTimeout(resolve, 500));
             }
         }
 
@@ -94,35 +164,59 @@ function createWindow() {
     // 🌐 Gestion du mode hors connexion
     win.webContents.on(
         "did-fail-load",
-        async (event, errorCode, errorDescription, validatedURL, isMainFrame) => {
+        async (
+            event,
+            errorCode,
+            errorDescription,
+            validatedURL,
+            isMainFrame,
+        ) => {
             // Uniquement si c'est la page principale (pas un asset comme une image ou un script)
-            if (isMainFrame && (validatedURL.startsWith(REMOTE_BASE_URL) || validatedURL.startsWith(LOCAL_DEV_URL))) {
-                console.log(`Échec du chargement de la page (${validatedURL}) :`, errorDescription);
+            if (
+                isMainFrame &&
+                (validatedURL.startsWith(REMOTE_BASE_URL) ||
+                    validatedURL.startsWith(LOCAL_DEV_URL))
+            ) {
+                console.log(
+                    `Échec du chargement de la page (${validatedURL}) :`,
+                    errorDescription,
+                );
 
                 if (validatedURL.startsWith(REMOTE_BASE_URL)) {
-                    console.log("Échec du serveur en ligne. Chargement du splash screen local d'attente...");
-                    win.loadFile(path.join(__dirname, "public", "loading.html"));
+                    console.log(
+                        "Échec du serveur en ligne. Chargement du splash screen local d'attente...",
+                    );
+                    win.loadFile(
+                        path.join(__dirname, "public", "loading.html"),
+                    );
 
                     // Boucle de vérification du serveur local (jusqu'à 30 tentatives = 15 secondes)
                     for (let attempt = 1; attempt <= 30; attempt++) {
                         try {
                             const response = await fetch(LOCAL_DEV_URL);
                             if (response) {
-                                console.log(`Serveur local détecté (tentative ${attempt}). Redirection vers`, LOCAL_DEV_URL);
+                                console.log(
+                                    `Serveur local détecté (tentative ${attempt}). Redirection vers`,
+                                    LOCAL_DEV_URL,
+                                );
                                 win.loadURL(LOCAL_DEV_URL);
                                 return;
                             }
                         } catch (err) {
                             // Attendre 500ms avant la prochaine tentative
-                            await new Promise(resolve => setTimeout(resolve, 500));
+                            await new Promise((resolve) =>
+                                setTimeout(resolve, 500),
+                            );
                         }
                     }
                 }
 
-                console.log("Le serveur local n'a pas répondu ou a échoué. Chargement de la page hors-ligne.");
+                console.log(
+                    "Le serveur local n'a pas répondu ou a échoué. Chargement de la page hors-ligne.",
+                );
                 win.loadFile(path.join(__dirname, "public", "offline.html"));
             }
-        }
+        },
     );
 
     // 🔥 Liens externes dans le navigateur
@@ -139,14 +233,23 @@ function createWindow() {
             webPreferences: { nodeIntegration: false, contextIsolation: true },
         });
         activePrintWindows.add(printWindow);
-        printWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(htmlContent)}`);
+        printWindow.loadURL(
+            `data:text/html;charset=utf-8,${encodeURIComponent(htmlContent)}`,
+        );
         printWindow.webContents.on("did-finish-load", () => {
             setTimeout(() => {
                 printWindow.webContents.print(
-                    { silent: true, printBackground: true, margins: { marginType: "none" } },
+                    {
+                        silent: true,
+                        printBackground: true,
+                        margins: { marginType: "none" },
+                    },
                     (success, failureReason) => {
                         if (!success) {
-                            console.error("Erreur d'impression silencieuse :", failureReason);
+                            console.error(
+                                "Erreur d'impression silencieuse :",
+                                failureReason,
+                            );
                             event.reply("print-error", failureReason);
                         }
                         printWindow.close();
@@ -196,7 +299,8 @@ function initDatabase() {
                 is_blocked INTEGER DEFAULT 0,
                 deleted_at TEXT,
                 created_at TEXT,
-                updated_at TEXT
+                updated_at TEXT,
+                synced INTEGER DEFAULT 1
             );
         `);
 
@@ -210,7 +314,8 @@ function initDatabase() {
                 is_active INTEGER DEFAULT 1,
                 created_by INTEGER,
                 created_at TEXT,
-                updated_at TEXT
+                updated_at TEXT,
+                synced INTEGER DEFAULT 1
             );
         `);
 
@@ -227,7 +332,8 @@ function initDatabase() {
                 is_active INTEGER DEFAULT 1,
                 notes TEXT,
                 created_at TEXT,
-                updated_at TEXT
+                updated_at TEXT,
+                synced INTEGER DEFAULT 1
             );
         `);
 
@@ -248,7 +354,8 @@ function initDatabase() {
                 is_active INTEGER DEFAULT 1,
                 created_by INTEGER,
                 created_at TEXT,
-                updated_at TEXT
+                updated_at TEXT,
+                synced INTEGER DEFAULT 1
             );
         `);
 
@@ -263,7 +370,8 @@ function initDatabase() {
                 debt_balance REAL DEFAULT 0,
                 is_credit_blocked INTEGER DEFAULT 0,
                 created_at TEXT,
-                updated_at TEXT
+                updated_at TEXT,
+                synced INTEGER DEFAULT 1
             );
         `);
 
@@ -328,7 +436,8 @@ function initDatabase() {
                 subtotal REAL NOT NULL,
                 returned_quantity INTEGER DEFAULT 0,
                 created_at TEXT,
-                updated_at TEXT
+                updated_at TEXT,
+                synced INTEGER DEFAULT 1
             );
         `);
 
@@ -361,25 +470,10 @@ function initDatabase() {
             );
         `);
 
-        // Table de tracking pour les opérations hors-ligne à synchroniser
-        db.exec(`
-            CREATE TABLE IF NOT EXISTS sync_queue (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                entity_type TEXT NOT NULL,
-                entity_local_id INTEGER NOT NULL,
-                operation TEXT NOT NULL,
-                payload TEXT NOT NULL,
-                created_at TEXT DEFAULT (datetime('now')),
-                synced INTEGER DEFAULT 0,
-                sync_error TEXT
-            );
-        `);
-
         console.log("✅ Toutes les tables SQLite initialisées.");
 
         // ─── Enregistrement des handlers IPC ──────────────────────────────────
         registerIpcHandlers();
-
     } catch (e) {
         console.error("Erreur d'initialisation SQLite :", e);
     }
@@ -391,104 +485,186 @@ function now() {
 }
 
 function generateRef(prefix) {
-    return prefix + "-" + Math.random().toString(36).substring(2, 10).toUpperCase();
+    return (
+        prefix + "-" + Math.random().toString(36).substring(2, 10).toUpperCase()
+    );
 }
 
 // ─── Handlers IPC ─────────────────────────────────────────────────────────────
 function registerIpcHandlers() {
-
     // ── Lecture des données de référence ──────────────────────────────────────
 
     ipcMain.handle("sqlite-get-products", async () => {
         try {
-            return db.prepare("SELECT * FROM products WHERE is_active = 1").all();
-        } catch (e) { console.error(e); return []; }
+            return db
+                .prepare("SELECT * FROM products WHERE is_active = 1")
+                .all();
+        } catch (e) {
+            console.error(e);
+            return [];
+        }
     });
 
     ipcMain.handle("sqlite-get-all-products", async () => {
         try {
-            return db.prepare("SELECT * FROM products WHERE is_active = 1").all();
-        } catch (e) { console.error(e); return []; }
+            return db
+                .prepare("SELECT * FROM products WHERE is_active = 1")
+                .all();
+        } catch (e) {
+            console.error(e);
+            return [];
+        }
     });
 
     ipcMain.handle("sqlite-get-categories", async () => {
         try {
-            return db.prepare("SELECT * FROM categories WHERE is_active = 1").all();
-        } catch (e) { console.error(e); return []; }
+            return db
+                .prepare("SELECT * FROM categories WHERE is_active = 1")
+                .all();
+        } catch (e) {
+            console.error(e);
+            return [];
+        }
     });
 
     ipcMain.handle("sqlite-get-customers", async () => {
         try {
             return db.prepare("SELECT * FROM customers ORDER BY name").all();
-        } catch (e) { console.error(e); return []; }
+        } catch (e) {
+            console.error(e);
+            return [];
+        }
     });
 
     ipcMain.handle("sqlite-search-customers", async (event, query) => {
         try {
             const q = `%${query}%`;
-            return db.prepare("SELECT * FROM customers WHERE name LIKE ? OR phone LIKE ? ORDER BY name LIMIT 10").all(q, q);
-        } catch (e) { console.error(e); return []; }
+            return db
+                .prepare(
+                    "SELECT * FROM customers WHERE name LIKE ? OR phone LIKE ? ORDER BY name LIMIT 10",
+                )
+                .all(q, q);
+        } catch (e) {
+            console.error(e);
+            return [];
+        }
     });
 
     ipcMain.handle("sqlite-get-settings", async () => {
         try {
             return db.prepare("SELECT * FROM settings LIMIT 1").get();
-        } catch (e) { console.error(e); return null; }
+        } catch (e) {
+            console.error(e);
+            return null;
+        }
     });
 
     ipcMain.handle("sqlite-get-user", async (event, userId) => {
         try {
-            return db.prepare("SELECT id, name, email, role, phone, address, gender FROM users WHERE id = ?").get(userId);
-        } catch (e) { console.error(e); return null; }
+            return db
+                .prepare(
+                    "SELECT id, name, email, role, phone, address, gender FROM users WHERE id = ?",
+                )
+                .get(userId);
+        } catch (e) {
+            console.error(e);
+            return null;
+        }
     });
 
     // ── Session de caisse ──────────────────────────────────────────────────────
 
     ipcMain.handle("sqlite-get-active-session", async (event, userId) => {
         try {
-            return db.prepare("SELECT * FROM cash_sessions WHERE user_id = ? AND status = 'open' LIMIT 1").get(userId ?? null);
-        } catch (e) { console.error(e); return null; }
+            return db
+                .prepare(
+                    "SELECT * FROM cash_sessions WHERE user_id = ? AND status = 'open' LIMIT 1",
+                )
+                .get(userId ?? null);
+        } catch (e) {
+            console.error(e);
+            return null;
+        }
     });
 
-    ipcMain.handle("sqlite-open-session", async (event, { userId, openingBalance }) => {
-        try {
-            const existing = db.prepare("SELECT id FROM cash_sessions WHERE user_id = ? AND status = 'open'").get(userId ?? null);
-            if (existing) return { success: false, message: "Une session de caisse est déjà active.", session: existing };
+    ipcMain.handle(
+        "sqlite-open-session",
+        async (event, { userId, openingBalance }) => {
+            try {
+                const existing = db
+                    .prepare(
+                        "SELECT id FROM cash_sessions WHERE user_id = ? AND status = 'open'",
+                    )
+                    .get(userId ?? null);
+                if (existing)
+                    return {
+                        success: false,
+                        message: "Une session de caisse est déjà active.",
+                        session: existing,
+                    };
 
-            const ts = now();
-            const stmt = db.prepare(`
+                const ts = now();
+                const stmt = db.prepare(`
                 INSERT INTO cash_sessions (user_id, opening_balance, opened_at, status, created_at, updated_at, synced)
                 VALUES (?, ?, ?, 'open', ?, ?, 0)
             `);
-            const res = stmt.run(userId ?? null, openingBalance, ts, ts, ts);
-            const session = db.prepare("SELECT * FROM cash_sessions WHERE id = ?").get(Number(res.lastInsertRowid));
+                const res = stmt.run(
+                    userId ?? null,
+                    openingBalance,
+                    ts,
+                    ts,
+                    ts,
+                );
+                const session = db
+                    .prepare("SELECT * FROM cash_sessions WHERE id = ?")
+                    .get(Number(res.lastInsertRowid));
 
-            // Ajouter dans la sync_queue
-            db.prepare("INSERT INTO sync_queue (entity_type, entity_local_id, operation, payload, created_at) VALUES (?,?,?,?,?)")
-              .run("cash_session", Number(res.lastInsertRowid), "create", JSON.stringify(session), ts);
+                return {
+                    success: true,
+                    message: "Caisse ouverte avec succès.",
+                    session,
+                };
+            } catch (e) {
+                console.error(e);
+                return { success: false, message: e.message };
+            }
+        },
+    );
 
-            return { success: true, message: "Caisse ouverte avec succès.", session };
-        } catch (e) { console.error(e); return { success: false, message: e.message }; }
-    });
+    ipcMain.handle(
+        "sqlite-close-session",
+        async (event, { userId, actualClosingBalance }) => {
+            try {
+                const session = db
+                    .prepare(
+                        "SELECT * FROM cash_sessions WHERE user_id = ? AND status = 'open'",
+                    )
+                    .get(userId);
+                if (!session)
+                    return {
+                        success: false,
+                        message: "Aucune session active à clôturer.",
+                    };
 
-    ipcMain.handle("sqlite-close-session", async (event, { userId, actualClosingBalance }) => {
-        try {
-            const session = db.prepare("SELECT * FROM cash_sessions WHERE user_id = ? AND status = 'open'").get(userId);
-            if (!session) return { success: false, message: "Aucune session active à clôturer." };
+                const totalSales = db
+                    .prepare(
+                        "SELECT COALESCE(SUM(total_amount),0) as total FROM sales WHERE cash_session_id = ? AND status = 'completed'",
+                    )
+                    .get(session.id).total;
 
-            const totalSales = db.prepare(
-                "SELECT COALESCE(SUM(total_amount),0) as total FROM sales WHERE cash_session_id = ? AND status = 'completed'"
-            ).get(session.id).total;
+                const totalRepayments = db
+                    .prepare(
+                        "SELECT COALESCE(SUM(amount),0) as total FROM debt_payments WHERE cash_session_id = ?",
+                    )
+                    .get(session.id).total;
 
-            const totalRepayments = db.prepare(
-                "SELECT COALESCE(SUM(amount),0) as total FROM debt_payments WHERE cash_session_id = ?"
-            ).get(session.id).total;
+                const expected =
+                    session.opening_balance + totalSales + totalRepayments;
+                const difference = actualClosingBalance - expected;
+                const ts = now();
 
-            const expected = session.opening_balance + totalSales + totalRepayments;
-            const difference = actualClosingBalance - expected;
-            const ts = now();
-
-            db.prepare(`
+                db.prepare(
+                    `
                 UPDATE cash_sessions SET
                     expected_closing_balance = ?,
                     actual_closing_balance = ?,
@@ -498,48 +674,98 @@ function registerIpcHandlers() {
                     updated_at = ?,
                     synced = 0
                 WHERE id = ?
-            `).run(expected, actualClosingBalance, difference, ts, ts, session.id);
+            `,
+                ).run(
+                    expected,
+                    actualClosingBalance,
+                    difference,
+                    ts,
+                    ts,
+                    session.id,
+                );
 
-            const updated = db.prepare("SELECT * FROM cash_sessions WHERE id = ?").get(session.id);
+                const updated = db
+                    .prepare("SELECT * FROM cash_sessions WHERE id = ?")
+                    .get(session.id);
 
-            // Ajouter dans la sync_queue
-            db.prepare("INSERT INTO sync_queue (entity_type, entity_local_id, operation, payload, created_at) VALUES (?,?,?,?,?)")
-              .run("cash_session", session.id, "close", JSON.stringify(updated), ts);
-
-            return { success: true, message: "Caisse clôturée avec succès.", session: updated };
-        } catch (e) { console.error(e); return { success: false, message: e.message }; }
-    });
+                return {
+                    success: true,
+                    message: "Caisse clôturée avec succès.",
+                    session: updated,
+                };
+            } catch (e) {
+                console.error(e);
+                return { success: false, message: e.message };
+            }
+        },
+    );
 
     // ── Ventes ────────────────────────────────────────────────────────────────
 
     ipcMain.handle("sqlite-create-sale", async (event, saleData) => {
         try {
             const userId = saleData.userId || saleData.user_id;
-            const cashSessionId = saleData.cashSessionId || saleData.cash_session_id;
+            const cashSessionId =
+                saleData.cashSessionId || saleData.cash_session_id;
             const customerId = saleData.customerId || saleData.customer_id;
-            const totalAmount = saleData.totalAmount !== undefined ? saleData.totalAmount : saleData.total_amount;
-            const amountReceived = saleData.amountReceived !== undefined ? saleData.amountReceived : saleData.amount_received;
-            const changeAmount = saleData.changeAmount !== undefined ? saleData.changeAmount : saleData.change_amount;
-            const paymentMethod = saleData.paymentMethod || saleData.payment_method;
+            const totalAmount =
+                saleData.totalAmount !== undefined
+                    ? saleData.totalAmount
+                    : saleData.total_amount;
+            const amountReceived =
+                saleData.amountReceived !== undefined
+                    ? saleData.amountReceived
+                    : saleData.amount_received;
+            const changeAmount =
+                saleData.changeAmount !== undefined
+                    ? saleData.changeAmount
+                    : saleData.change_amount;
+            const paymentMethod =
+                saleData.paymentMethod || saleData.payment_method;
             const createdAt = saleData.createdAt || saleData.created_at;
             const items = saleData.items;
 
             // Vérifier session caisse
-            const session = db.prepare("SELECT id FROM cash_sessions WHERE id = ? AND status = 'open'").get(cashSessionId);
-            if (!session) return { success: false, message: "Aucune session de caisse ouverte." };
+            const session = db
+                .prepare(
+                    "SELECT id FROM cash_sessions WHERE id = ? AND status = 'open'",
+                )
+                .get(cashSessionId);
+            if (!session)
+                return {
+                    success: false,
+                    message: "Aucune session de caisse ouverte.",
+                };
 
             // Vérifier stock
             for (const item of items) {
-                const product = db.prepare("SELECT stock, name FROM products WHERE id = ?").get(item.id);
-                if (!product) return { success: false, message: `Produit introuvable: ${item.id}` };
-                if (product.stock < item.qty) return { success: false, message: `Stock insuffisant pour: ${product.name}` };
+                const product = db
+                    .prepare("SELECT stock, name FROM products WHERE id = ?")
+                    .get(item.id);
+                if (!product)
+                    return {
+                        success: false,
+                        message: `Produit introuvable: ${item.id}`,
+                    };
+                if (product.stock < item.qty)
+                    return {
+                        success: false,
+                        message: `Stock insuffisant pour: ${product.name}`,
+                    };
             }
 
             // Si crédit, vérifier client non bloqué
             if (paymentMethod === "credit" && customerId) {
-                const cust = db.prepare("SELECT is_credit_blocked, name FROM customers WHERE id = ?").get(customerId);
+                const cust = db
+                    .prepare(
+                        "SELECT is_credit_blocked, name FROM customers WHERE id = ?",
+                    )
+                    .get(customerId);
                 if (cust && cust.is_credit_blocked) {
-                    return { success: false, message: `Le client ${cust.name} est bloqué pour les achats à crédit.` };
+                    return {
+                        success: false,
+                        message: `Le client ${cust.name} est bloqué pour les achats à crédit.`,
+                    };
                 }
             }
 
@@ -552,8 +778,16 @@ function registerIpcHandlers() {
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'completed', ?, ?, 0)
             `);
             const saleRes = saleStmt.run(
-                userId, cashSessionId, customerId || null, totalAmount,
-                amountReceived, changeAmount, paymentMethod, reference, ts, ts
+                userId,
+                cashSessionId,
+                customerId || null,
+                totalAmount,
+                amountReceived,
+                changeAmount,
+                paymentMethod,
+                reference,
+                ts,
+                ts,
             );
             const saleId = Number(saleRes.lastInsertRowid);
 
@@ -564,16 +798,32 @@ function registerIpcHandlers() {
 
             const lowStockAlerts = [];
             for (const item of items) {
-                itemStmt.run(saleId, item.id, item.qty, item.price, item.price * item.qty, ts, ts);
+                itemStmt.run(
+                    saleId,
+                    item.id,
+                    item.qty,
+                    item.price,
+                    item.price * item.qty,
+                    ts,
+                    ts,
+                );
 
                 // Décrémenter le stock local
-                db.prepare("UPDATE products SET stock = stock - ?, updated_at = ? WHERE id = ?")
-                  .run(item.qty, ts, item.id);
+                db.prepare(
+                    "UPDATE products SET stock = stock - ?, updated_at = ? WHERE id = ?",
+                ).run(item.qty, ts, item.id);
 
                 // Vérifier seuil de stock
-                const product = db.prepare("SELECT name, stock, stock_threshold FROM products WHERE id = ?").get(item.id);
+                const product = db
+                    .prepare(
+                        "SELECT name, stock, stock_threshold FROM products WHERE id = ?",
+                    )
+                    .get(item.id);
                 if (product && product.stock <= product.stock_threshold) {
-                    lowStockAlerts.push({ name: product.name, current_stock: product.stock });
+                    lowStockAlerts.push({
+                        name: product.name,
+                        current_stock: product.stock,
+                    });
                 }
             }
 
@@ -581,26 +831,34 @@ function registerIpcHandlers() {
             if (customerId && paymentMethod === "credit") {
                 const debt = Math.max(0, totalAmount - amountReceived);
                 if (debt > 0) {
-                    db.prepare("UPDATE customers SET debt_balance = debt_balance + ?, updated_at = ? WHERE id = ?")
-                      .run(debt, ts, customerId);
+                    db.prepare(
+                        "UPDATE customers SET debt_balance = debt_balance + ?, updated_at = ? WHERE id = ?",
+                    ).run(debt, ts, customerId);
                 }
             }
 
             // Récupérer la vente complète avec items
-            const sale = db.prepare("SELECT * FROM sales WHERE id = ?").get(saleId);
-            const saleItems = db.prepare(`
+            const sale = db
+                .prepare("SELECT * FROM sales WHERE id = ?")
+                .get(saleId);
+            const saleItems = db
+                .prepare(
+                    `
                 SELECT si.*, p.name as product_name FROM sale_items si
                 LEFT JOIN products p ON p.id = si.product_id
                 WHERE si.sale_id = ?
-            `).all(saleId);
+            `,
+                )
+                .all(saleId);
 
             const saleWithItems = { ...sale, items: saleItems };
 
-            // Ajouter dans la sync_queue
-            db.prepare("INSERT INTO sync_queue (entity_type, entity_local_id, operation, payload, created_at) VALUES (?,?,?,?,?)")
-              .run("sale", saleId, "create", JSON.stringify({ sale: saleWithItems, items }), ts);
-
-            return { success: true, message: "Vente enregistrée avec succès.", sale: saleWithItems, low_stock_alerts: lowStockAlerts };
+            return {
+                success: true,
+                message: "Vente enregistrée avec succès.",
+                sale: saleWithItems,
+                low_stock_alerts: lowStockAlerts,
+            };
         } catch (e) {
             console.error("Erreur création vente SQLite:", e);
             return { success: false, message: e.message };
@@ -609,56 +867,86 @@ function registerIpcHandlers() {
 
     ipcMain.handle("sqlite-get-sales", async (event, userId) => {
         try {
-            const sales = db.prepare(`
+            const sales = db
+                .prepare(
+                    `
                 SELECT s.*, c.name as customer_name FROM sales s
                 LEFT JOIN customers c ON c.id = s.customer_id
                 WHERE s.user_id = ?
                 ORDER BY s.created_at DESC LIMIT 50
-            `).all(userId);
+            `,
+                )
+                .all(userId);
 
             for (const sale of sales) {
-                sale.items = db.prepare(`
+                sale.items = db
+                    .prepare(
+                        `
                     SELECT si.*, p.name as product_name FROM sale_items si
                     LEFT JOIN products p ON p.id = si.product_id
                     WHERE si.sale_id = ?
-                `).all(sale.id);
+                `,
+                    )
+                    .all(sale.id);
             }
             return sales;
-        } catch (e) { console.error(e); return []; }
+        } catch (e) {
+            console.error(e);
+            return [];
+        }
     });
 
     ipcMain.handle("sqlite-refund-sale", async (event, { saleId, userId }) => {
         try {
-            const sale = db.prepare("SELECT * FROM sales WHERE id = ?").get(saleId);
+            const sale = db
+                .prepare("SELECT * FROM sales WHERE id = ?")
+                .get(saleId);
             if (!sale) return { success: false, message: "Vente introuvable." };
-            if (sale.status === "returned") return { success: false, message: "Cette vente a déjà été remboursée." };
+            if (sale.status === "returned")
+                return {
+                    success: false,
+                    message: "Cette vente a déjà été remboursée.",
+                };
 
-            const items = db.prepare("SELECT * FROM sale_items WHERE sale_id = ?").all(saleId);
+            const items = db
+                .prepare("SELECT * FROM sale_items WHERE sale_id = ?")
+                .all(saleId);
             const ts = now();
 
             for (const item of items) {
-                db.prepare("UPDATE products SET stock = stock + ?, updated_at = ? WHERE id = ?")
-                  .run(item.quantity, ts, item.product_id);
-                db.prepare("UPDATE sale_items SET returned_quantity = quantity, updated_at = ? WHERE id = ?")
-                  .run(ts, item.id);
+                db.prepare(
+                    "UPDATE products SET stock = stock + ?, updated_at = ? WHERE id = ?",
+                ).run(item.quantity, ts, item.product_id);
+                db.prepare(
+                    "UPDATE sale_items SET returned_quantity = quantity, updated_at = ? WHERE id = ?",
+                ).run(ts, item.id);
             }
 
             if (sale.customer_id && sale.payment_method === "credit") {
-                const debt = Math.max(0, sale.total_amount - (sale.amount_received || 0));
+                const debt = Math.max(
+                    0,
+                    sale.total_amount - (sale.amount_received || 0),
+                );
                 if (debt > 0) {
-                    db.prepare("UPDATE customers SET debt_balance = MAX(0, debt_balance - ?), updated_at = ? WHERE id = ?")
-                      .run(debt, ts, sale.customer_id);
+                    db.prepare(
+                        "UPDATE customers SET debt_balance = MAX(0, debt_balance - ?), updated_at = ? WHERE id = ?",
+                    ).run(debt, ts, sale.customer_id);
                 }
             }
 
-            db.prepare("UPDATE sales SET status = 'returned', refunded_amount = ?, updated_at = ?, synced = 0 WHERE id = ?")
-              .run(sale.total_amount, ts, saleId);
+            db.prepare(
+                "UPDATE sales SET status = 'returned', refunded_amount = ?, updated_at = ?, synced = 0 WHERE id = ?",
+            ).run(sale.total_amount, ts, saleId);
 
-            db.prepare("INSERT INTO sync_queue (entity_type, entity_local_id, operation, payload, created_at) VALUES (?,?,?,?,?)")
-              .run("sale", saleId, "refund", JSON.stringify({ saleId }), ts);
-
-            return { success: true, message: "La vente a été annulée et les articles remis en stock." };
-        } catch (e) { console.error(e); return { success: false, message: e.message }; }
+            return {
+                success: true,
+                message:
+                    "La vente a été annulée et les articles remis en stock.",
+            };
+        } catch (e) {
+            console.error(e);
+            return { success: false, message: e.message };
+        }
     });
 
     // ── Clients ───────────────────────────────────────────────────────────────
@@ -667,54 +955,98 @@ function registerIpcHandlers() {
         try {
             const { name, phone, email, address } = customerData;
             const ts = now();
-            const res = db.prepare(`
+            const res = db
+                .prepare(
+                    `
                 INSERT INTO customers (name, phone, email, address, loyalty_points, debt_balance, created_at, updated_at)
                 VALUES (?, ?, ?, ?, 0, 0, ?, ?)
-            `).run(name, phone || null, email || null, address || null, ts, ts);
-            const customer = db.prepare("SELECT * FROM customers WHERE id = ?").get(Number(res.lastInsertRowid));
+            `,
+                )
+                .run(
+                    name,
+                    phone || null,
+                    email || null,
+                    address || null,
+                    ts,
+                    ts,
+                );
+            const customer = db
+                .prepare("SELECT * FROM customers WHERE id = ?")
+                .get(Number(res.lastInsertRowid));
 
-            db.prepare("INSERT INTO sync_queue (entity_type, entity_local_id, operation, payload, created_at) VALUES (?,?,?,?,?)")
-              .run("customer", customer.id, "create", JSON.stringify(customer), ts);
-
-            return { success: true, message: "Client enregistré avec succès.", customer };
-        } catch (e) { console.error(e); return { success: false, message: e.message }; }
+            return {
+                success: true,
+                message: "Client enregistré avec succès.",
+                customer,
+            };
+        } catch (e) {
+            console.error(e);
+            return { success: false, message: e.message };
+        }
     });
 
     // ── Paiements de dettes ───────────────────────────────────────────────────
 
-    ipcMain.handle("sqlite-pay-debt", async (event, { customerId, userId, cashSessionId, amount }) => {
-        try {
-            const customer = db.prepare("SELECT * FROM customers WHERE id = ?").get(customerId);
-            if (!customer) return { success: false, message: "Client introuvable." };
+    ipcMain.handle(
+        "sqlite-pay-debt",
+        async (event, { customerId, userId, cashSessionId, amount }) => {
+            try {
+                const customer = db
+                    .prepare("SELECT * FROM customers WHERE id = ?")
+                    .get(customerId);
+                if (!customer)
+                    return { success: false, message: "Client introuvable." };
 
-            const amountToPay = Math.min(customer.debt_balance, amount);
-            if (amountToPay <= 0) return { success: false, message: "Ce client n'a pas de dette active." };
+                const amountToPay = Math.min(customer.debt_balance, amount);
+                if (amountToPay <= 0)
+                    return {
+                        success: false,
+                        message: "Ce client n'a pas de dette active.",
+                    };
 
-            const ts = now();
-            const reference = generateRef("PAY");
+                const ts = now();
+                const reference = generateRef("PAY");
 
-            db.prepare("UPDATE customers SET debt_balance = debt_balance - ?, updated_at = ? WHERE id = ?")
-              .run(amountToPay, ts, customerId);
+                db.prepare(
+                    "UPDATE customers SET debt_balance = debt_balance - ?, updated_at = ? WHERE id = ?",
+                ).run(amountToPay, ts, customerId);
 
-            const res = db.prepare(`
+                const res = db
+                    .prepare(
+                        `
                 INSERT INTO debt_payments (customer_id, user_id, cash_session_id, amount, reference, payment_method, created_at, updated_at, synced)
                 VALUES (?, ?, ?, ?, ?, 'cash', ?, ?, 0)
-            `).run(customerId, userId, cashSessionId || null, amountToPay, reference, ts, ts);
+            `,
+                    )
+                    .run(
+                        customerId,
+                        userId,
+                        cashSessionId || null,
+                        amountToPay,
+                        reference,
+                        ts,
+                        ts,
+                    );
 
-            const payment = db.prepare("SELECT * FROM debt_payments WHERE id = ?").get(Number(res.lastInsertRowid));
-            const updatedCustomer = db.prepare("SELECT * FROM customers WHERE id = ?").get(customerId);
+                const payment = db
+                    .prepare("SELECT * FROM debt_payments WHERE id = ?")
+                    .get(Number(res.lastInsertRowid));
+                const updatedCustomer = db
+                    .prepare("SELECT * FROM customers WHERE id = ?")
+                    .get(customerId);
 
-            db.prepare("INSERT INTO sync_queue (entity_type, entity_local_id, operation, payload, created_at) VALUES (?,?,?,?,?)")
-              .run("debt_payment", payment.id, "create", JSON.stringify(payment), ts);
-
-            return {
-                success: true,
-                message: `Encaissement de ${amountToPay.toFixed(0)} FCFA enregistré avec succès.`,
-                payment,
-                new_debt_balance: updatedCustomer.debt_balance
-            };
-        } catch (e) { console.error(e); return { success: false, message: e.message }; }
-    });
+                return {
+                    success: true,
+                    message: `Encaissement de ${amountToPay.toFixed(0)} FCFA enregistré avec succès.`,
+                    payment,
+                    new_debt_balance: updatedCustomer.debt_balance,
+                };
+            } catch (e) {
+                console.error(e);
+                return { success: false, message: e.message };
+            }
+        },
+    );
 
     // ── Statistiques dashboard ─────────────────────────────────────────────────
 
@@ -722,17 +1054,27 @@ function registerIpcHandlers() {
         try {
             const today = now().substring(0, 10);
 
-            const todaySales = db.prepare(`
+            const todaySales = db
+                .prepare(
+                    `
                 SELECT COALESCE(SUM(total_amount),0) as revenue, COUNT(*) as count
                 FROM sales WHERE user_id = ? AND date(created_at) = ? AND status = 'completed'
-            `).get(userId, today);
+            `,
+                )
+                .get(userId, today);
 
-            const totalSales = db.prepare(`
+            const totalSales = db
+                .prepare(
+                    `
                 SELECT COALESCE(SUM(total_amount),0) as revenue, COUNT(*) as count
                 FROM sales WHERE user_id = ? AND status = 'completed'
-            `).get(userId);
+            `,
+                )
+                .get(userId);
 
-            const topProducts = db.prepare(`
+            const topProducts = db
+                .prepare(
+                    `
                 SELECT si.product_id, p.name as product_name,
                     SUM(si.quantity) as total_qty, SUM(si.subtotal) as total_subtotal
                 FROM sale_items si
@@ -740,7 +1082,9 @@ function registerIpcHandlers() {
                 LEFT JOIN products p ON p.id = si.product_id
                 WHERE s.user_id = ? AND s.status = 'completed'
                 GROUP BY si.product_id ORDER BY total_qty DESC LIMIT 5
-            `).all(userId);
+            `,
+                )
+                .all(userId);
 
             const days = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
             const weeklySales = [];
@@ -748,28 +1092,41 @@ function registerIpcHandlers() {
                 const d = new Date();
                 d.setDate(d.getDate() - i);
                 const dateStr = d.toISOString().substring(0, 10);
-                const dayRevenue = db.prepare(`
+                const dayRevenue = db
+                    .prepare(
+                        `
                     SELECT COALESCE(SUM(total_amount),0) as total FROM sales
                     WHERE user_id = ? AND date(created_at) = ? AND status = 'completed'
-                `).get(userId, dateStr);
+                `,
+                    )
+                    .get(userId, dateStr);
                 weeklySales.push({
                     day: days[d.getDay()],
-                    date: `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}`,
-                    revenue: dayRevenue.total
+                    date: `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`,
+                    revenue: dayRevenue.total,
                 });
             }
 
             return {
                 todayRevenue: todaySales.revenue,
                 todayCount: todaySales.count,
-                todayAverage: todaySales.count > 0 ? todaySales.revenue / todaySales.count : 0,
+                todayAverage:
+                    todaySales.count > 0
+                        ? todaySales.revenue / todaySales.count
+                        : 0,
                 totalRevenue: totalSales.revenue,
                 totalCount: totalSales.count,
-                totalAverage: totalSales.count > 0 ? totalSales.revenue / totalSales.count : 0,
+                totalAverage:
+                    totalSales.count > 0
+                        ? totalSales.revenue / totalSales.count
+                        : 0,
                 topProducts,
-                weeklySales
+                weeklySales,
             };
-        } catch (e) { console.error(e); return {}; }
+        } catch (e) {
+            console.error(e);
+            return {};
+        }
     });
 
     // ─── Synchronisation ──────────────────────────────────────────────────────
@@ -779,16 +1136,20 @@ function registerIpcHandlers() {
      */
     ipcMain.handle("sqlite-pull", async (event, { baseUrl, sessionCookie }) => {
         try {
-            console.log("🔄 Début du PULL depuis", baseUrl);
+            const targetUrl =
+                baseUrl.includes("127.0.0.1") || baseUrl.includes("localhost")
+                    ? REMOTE_BASE_URL
+                    : baseUrl;
+            console.log("🔄 Début du PULL depuis", targetUrl);
             const headers = {
                 "Content-Type": "application/json",
                 "X-Sync-Key": SYNC_API_KEY,
-                "Cookie": sessionCookie || ""
+                Cookie: sessionCookie || "",
             };
 
-            const response = await fetch(`${baseUrl}/api/sync/pull`, {
+            const response = await fetch(`${targetUrl}/api/sync/pull`, {
                 method: "GET",
-                headers
+                headers,
             });
 
             if (!response.ok) {
@@ -822,7 +1183,7 @@ function registerIpcHandlers() {
                         u.deleted_at ? 1 : 0,
                         u.deleted_at ?? null,
                         u.created_at ?? null,
-                        u.updated_at ?? null
+                        u.updated_at ?? null,
                     );
                 }
             }
@@ -843,7 +1204,7 @@ function registerIpcHandlers() {
                         c.is_active ? 1 : 0,
                         c.created_by ?? null,
                         c.created_at ?? null,
-                        c.updated_at ?? null
+                        c.updated_at ?? null,
                     );
                 }
             }
@@ -867,7 +1228,7 @@ function registerIpcHandlers() {
                         s.is_active ? 1 : 0,
                         s.notes ?? null,
                         s.created_at ?? null,
-                        s.updated_at ?? null
+                        s.updated_at ?? null,
                     );
                 }
             }
@@ -895,7 +1256,7 @@ function registerIpcHandlers() {
                         p.is_active ? 1 : 0,
                         p.created_by ?? null,
                         p.created_at ?? null,
-                        p.updated_at ?? null
+                        p.updated_at ?? null,
                     );
                 }
             }
@@ -917,7 +1278,7 @@ function registerIpcHandlers() {
                         c.debt_balance ?? 0,
                         c.is_credit_blocked ? 1 : 0,
                         c.created_at ?? null,
-                        c.updated_at ?? null
+                        c.updated_at ?? null,
                     );
                 }
             }
@@ -925,17 +1286,41 @@ function registerIpcHandlers() {
             // Settings
             if (data.settings) {
                 const s = data.settings;
-                const existing = db.prepare("SELECT id FROM settings LIMIT 1").get();
+                const existing = db
+                    .prepare("SELECT id FROM settings LIMIT 1")
+                    .get();
                 if (existing) {
-                    db.prepare(`
+                    db.prepare(
+                        `
                         UPDATE settings SET store_name=?, phone=?, address=?, email=?, invoice_footer=?, invoice_format=?, updated_at=?
                         WHERE id=?
-                    `).run(s.store_name, s.phone, s.address, s.email ?? null, s.invoice_footer ?? null, s.invoice_format ?? "ticket", ts, existing.id);
+                    `,
+                    ).run(
+                        s.store_name,
+                        s.phone,
+                        s.address,
+                        s.email ?? null,
+                        s.invoice_footer ?? null,
+                        s.invoice_format ?? "ticket",
+                        ts,
+                        existing.id,
+                    );
                 } else {
-                    db.prepare(`
+                    db.prepare(
+                        `
                         INSERT INTO settings (store_name, phone, address, email, invoice_footer, invoice_format, created_at, updated_at)
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                    `).run(s.store_name, s.phone, s.address, s.email ?? null, s.invoice_footer ?? null, s.invoice_format ?? "ticket", ts, ts);
+                    `,
+                    ).run(
+                        s.store_name,
+                        s.phone,
+                        s.address,
+                        s.email ?? null,
+                        s.invoice_footer ?? null,
+                        s.invoice_format ?? "ticket",
+                        ts,
+                        ts,
+                    );
                 }
             }
 
@@ -955,9 +1340,9 @@ function registerIpcHandlers() {
                         cs.difference ?? null,
                         cs.opened_at ?? null,
                         cs.closed_at ?? null,
-                        cs.status ?? 'open',
+                        cs.status ?? "open",
                         cs.created_at ?? null,
-                        cs.updated_at ?? null
+                        cs.updated_at ?? null,
                     );
                 }
             }
@@ -980,12 +1365,12 @@ function registerIpcHandlers() {
                         sale.total_amount,
                         sale.amount_received ?? 0,
                         sale.change_amount ?? 0,
-                        sale.payment_method ?? 'cash',
+                        sale.payment_method ?? "cash",
                         sale.reference ?? null,
-                        sale.status ?? 'completed',
+                        sale.status ?? "completed",
                         sale.refunded_amount ?? 0,
                         sale.created_at ?? null,
-                        sale.updated_at ?? null
+                        sale.updated_at ?? null,
                     );
                     if (sale.items) {
                         for (const item of sale.items) {
@@ -998,7 +1383,7 @@ function registerIpcHandlers() {
                                 item.subtotal,
                                 item.returned_quantity ?? 0,
                                 item.created_at ?? null,
-                                item.updated_at ?? null
+                                item.updated_at ?? null,
                             );
                         }
                     }
@@ -1019,23 +1404,51 @@ function registerIpcHandlers() {
                         dp.cash_session_id ?? null,
                         dp.amount,
                         dp.reference ?? null,
-                        dp.payment_method ?? 'cash',
+                        dp.payment_method ?? "cash",
                         dp.created_at ?? null,
-                        dp.updated_at ?? null
+                        dp.updated_at ?? null,
                     );
                 }
             }
 
-            return { success: true, message: "Données synchronisées depuis le serveur avec succès.", stats: {
-                users: data.users?.length || 0,
-                categories: data.categories?.length || 0,
-                products: data.products?.length || 0,
-                customers: data.customers?.length || 0,
-                sales: data.sales?.length || 0,
-            }};
+            // Restock requests
+            if (data.restock_requests) {
+                const stmt = db.prepare(`
+                    INSERT OR REPLACE INTO restock_requests (id, product_id, user_id, status, quantity_requested, quantity_received, created_at, updated_at, synced)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
+                `);
+                for (const r of data.restock_requests) {
+                    stmt.run(
+                        r.id,
+                        r.product_id ?? null,
+                        r.user_id ?? null,
+                        r.status ?? "pending",
+                        r.quantity_requested ?? 0,
+                        r.quantity_received ?? 0,
+                        r.created_at ?? null,
+                        r.updated_at ?? null,
+                    );
+                }
+            }
+
+            return {
+                success: true,
+                message: "Données synchronisées depuis le serveur avec succès.",
+                stats: {
+                    users: data.users?.length || 0,
+                    categories: data.categories?.length || 0,
+                    products: data.products?.length || 0,
+                    customers: data.customers?.length || 0,
+                    sales: data.sales?.length || 0,
+                    restock_requests: data.restock_requests?.length || 0,
+                },
+            };
         } catch (e) {
             console.error("Erreur PULL:", e);
-            return { success: false, message: "Erreur lors du téléchargement : " + e.message };
+            return {
+                success: false,
+                message: "Erreur lors du téléchargement : " + e.message,
+            };
         }
     });
 
@@ -1044,30 +1457,21 @@ function registerIpcHandlers() {
      */
     ipcMain.handle("sqlite-push", async (event, { baseUrl, sessionCookie }) => {
         try {
-            console.log("🔄 Début du PUSH vers", baseUrl);
+            // Puisque la table sync_queue a été supprimée, nous gérons désormais la synchronisation PUSH
+            // directement via l'API Laravel locale au niveau de LocalSyncController@pushPending.
+            // Néanmoins, pour que le bouton ou l'interface de synchronisation d'Electron continue de fonctionner
+            // sans provoquer d'erreur SQLite, nous redirigeons l'appel vers la route locale de pushPending.
+            const targetUrl = baseUrl || "http://127.0.0.1:8000";
+            console.log(
+                "🔄 Redirection de sqlite-push vers l'API pushPending locale:",
+                `${targetUrl}/local/sync/push`,
+            );
 
-            const pending = db.prepare("SELECT * FROM sync_queue WHERE synced = 0 ORDER BY id ASC").all();
-            if (pending.length === 0) {
-                return { success: true, message: "Aucune donnée hors-ligne à synchroniser.", synced: 0 };
-            }
-
-            const payload = pending.map(row => ({
-                queue_id: row.id,
-                entity_type: row.entity_type,
-                entity_local_id: row.entity_local_id,
-                operation: row.operation,
-                data: JSON.parse(row.payload),
-                created_at: row.created_at
-            }));
-
-            const response = await fetch(`${baseUrl}/api/sync/push`, {
+            const response = await fetch(`${targetUrl}/local/sync/push`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
-                    "X-Sync-Key": SYNC_API_KEY,
-                    "Cookie": sessionCookie || ""
                 },
-                body: JSON.stringify({ operations: payload })
             });
 
             if (!response.ok) {
@@ -1076,43 +1480,18 @@ function registerIpcHandlers() {
             }
 
             const result = await response.json();
-            const syncedIds = result.synced_queue_ids || [];
-            const ts = now();
-
-            // Marquer comme synchronisés dans la queue
-            for (const qid of syncedIds) {
-                db.prepare("UPDATE sync_queue SET synced = 1 WHERE id = ?").run(qid);
-            }
-
-            // Marquer les entités correspondantes
-            const syncedRows = pending.filter(r => syncedIds.includes(r.id));
-            for (const row of syncedRows) {
-                if (row.entity_type === "sale") {
-                    db.prepare("UPDATE sales SET synced = 1, updated_at = ? WHERE id = ?").run(ts, row.entity_local_id);
-                } else if (row.entity_type === "customer") {
-                    // Le client a été créé en ligne, on peut récupérer son vrai ID si nécessaire
-                } else if (row.entity_type === "debt_payment") {
-                    db.prepare("UPDATE debt_payments SET synced = 1, updated_at = ? WHERE id = ?").run(ts, row.entity_local_id);
-                } else if (row.entity_type === "cash_session") {
-                    db.prepare("UPDATE cash_sessions SET synced = 1, updated_at = ? WHERE id = ?").run(ts, row.entity_local_id);
-                }
-            }
-
-            // Enregistrer les erreurs de sync
-            const errors = result.errors || [];
-            for (const err of errors) {
-                db.prepare("UPDATE sync_queue SET sync_error = ? WHERE id = ?").run(err.message, err.queue_id);
-            }
-
             return {
-                success: true,
-                message: `${syncedIds.length} opération(s) synchronisée(s) avec succès.`,
-                synced: syncedIds.length,
-                errors: errors
+                success: result.success,
+                message: result.message,
+                synced: result.synced_count || 0,
+                errors: result.errors_count || 0,
             };
         } catch (e) {
-            console.error("Erreur PUSH:", e);
-            return { success: false, message: "Erreur lors de la synchronisation : " + e.message };
+            console.error("Erreur PUSH redigé:", e);
+            return {
+                success: false,
+                message: "Erreur lors de la synchronisation : " + e.message,
+            };
         }
     });
 
@@ -1121,71 +1500,234 @@ function registerIpcHandlers() {
      */
     ipcMain.handle("sqlite-pending-count", async () => {
         try {
-            const result = db.prepare("SELECT COUNT(*) as count FROM sync_queue WHERE synced = 0").get();
-            return result.count;
-        } catch (e) { return 0; }
+            // Compter tous les enregistrements non synchronisés parmi nos tables principales
+            const tables = [
+                "sales",
+                "customers",
+                "debt_payments",
+                "cash_sessions",
+                "restock_requests",
+            ];
+            let totalPendingCount = 0;
+            for (const table of tables) {
+                try {
+                    const res = db
+                        .prepare(
+                            `SELECT COUNT(*) as count FROM ${table} WHERE synced = 0`,
+                        )
+                        .get();
+                    totalPendingCount += res ? res.count : 0;
+                } catch (err) {
+                    // La table n'a peut-être pas la colonne synced ou n'existe pas encore
+                }
+            }
+            return totalPendingCount;
+        } catch (e) {
+            return 0;
+        }
     });
 
-    ipcMain.handle("sqlite-get-session-expected-balance", async (event, sessionId) => {
+    ipcMain.handle(
+        "sqlite-get-session-expected-balance",
+        async (event, sessionId) => {
+            try {
+                const totalSales = db
+                    .prepare(
+                        "SELECT COALESCE(SUM(total_amount),0) as total FROM sales WHERE cash_session_id = ? AND status = 'completed'",
+                    )
+                    .get(sessionId).total;
+
+                const totalRepayments = db
+                    .prepare(
+                        "SELECT COALESCE(SUM(amount),0) as total FROM debt_payments WHERE cash_session_id = ?",
+                    )
+                    .get(sessionId).total;
+
+                const session = db
+                    .prepare("SELECT * FROM cash_sessions WHERE id = ?")
+                    .get(sessionId);
+                if (!session)
+                    return {
+                        success: false,
+                        message: "Session introuvable dans SQLite.",
+                    };
+
+                const expected =
+                    session.opening_balance + totalSales + totalRepayments;
+                return {
+                    success: true,
+                    openingBalance: session.opening_balance,
+                    totalSales,
+                    totalRepayments,
+                    expectedClosingBalance: expected,
+                };
+            } catch (e) {
+                console.error("sqlite-get-session-expected-balance error:", e);
+                return { success: false, message: e.message };
+            }
+        },
+    );
+
+    // Compatibilité ascendante avec les anciens handlers offline_sales
+    // Ces handlers sont utilisés par dashboard.blade.php en cas de coupure réseau.
+    // Désormais, on insère la vente DIRECTEMENT dans les tables sales et sale_items locales avec synced = 0,
+    // ce qui supprime définitivement le besoin d'une table sync_queue dédiée !
+    ipcMain.handle("save-offline-sale", async (event, saleData) => {
         try {
-            const totalSales = db.prepare(
-                "SELECT COALESCE(SUM(total_amount),0) as total FROM sales WHERE cash_session_id = ? AND status = 'completed'"
-            ).get(sessionId).total;
+            const ts = now();
+            const reference =
+                saleData.reference ||
+                "SAL-OFF-" +
+                    Math.random().toString(36).substr(2, 9).toUpperCase();
+            const userId = saleData.user_id || 1; // ID fallback de l'utilisateur
+            const customerId = saleData.customer_id || null;
+            const totalAmount = saleData.total_amount || 0;
+            const amountReceived = saleData.amount_received || 0;
+            const changeAmount = saleData.change_amount || 0;
+            const paymentMethod = saleData.payment_method || "cash";
+            const items = saleData.items || [];
 
-            const totalRepayments = db.prepare(
-                "SELECT COALESCE(SUM(amount),0) as total FROM debt_payments WHERE cash_session_id = ?"
-            ).get(sessionId).total;
+            // Trouver une session de caisse ouverte pour cet utilisateur ou n'importe quelle session ouverte
+            let cashSessionId = saleData.cash_session_id || null;
+            if (!cashSessionId) {
+                const openSession = db
+                    .prepare(
+                        "SELECT id FROM cash_sessions WHERE status = 'open' ORDER BY id DESC LIMIT 1",
+                    )
+                    .get();
+                if (openSession) {
+                    cashSessionId = openSession.id;
+                }
+            }
 
-            const session = db.prepare("SELECT * FROM cash_sessions WHERE id = ?").get(sessionId);
-            if (!session) return { success: false, message: "Session introuvable dans SQLite." };
+            // Insérer la vente principale
+            const saleStmt = db.prepare(`
+                INSERT INTO sales (user_id, cash_session_id, customer_id, total_amount, amount_received,
+                    change_amount, payment_method, reference, status, created_at, updated_at, synced)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'completed', ?, ?, 0)
+            `);
+            const saleRes = saleStmt.run(
+                userId,
+                cashSessionId,
+                customerId,
+                totalAmount,
+                amountReceived,
+                changeAmount,
+                paymentMethod,
+                reference,
+                ts,
+                ts,
+            );
+            const saleId = Number(saleRes.lastInsertRowid);
 
-            const expected = session.opening_balance + totalSales + totalRepayments;
-            return {
-                success: true,
-                openingBalance: session.opening_balance,
-                totalSales,
-                totalRepayments,
-                expectedClosingBalance: expected
-            };
+            // Insérer les items de la vente et décrémenter le stock local
+            const itemStmt = db.prepare(`
+                INSERT INTO sale_items (sale_id, product_id, quantity, unit_price, subtotal, created_at, updated_at, synced)
+                VALUES (?, ?, ?, ?, ?, ?, ?, 0)
+            `);
+
+            for (const item of items) {
+                const qty = item.qty || 1;
+                const price = item.price || 0;
+                itemStmt.run(saleId, item.id, qty, price, price * qty, ts, ts);
+
+                // Décrémenter le stock local
+                db.prepare(
+                    "UPDATE products SET stock = MAX(0, stock - ?), updated_at = ? WHERE id = ?",
+                ).run(qty, ts, item.id);
+            }
+
+            // Gérer la dette client (crédit)
+            if (customerId && paymentMethod === "credit") {
+                const debt = Math.max(0, totalAmount - amountReceived);
+                if (debt > 0) {
+                    db.prepare(
+                        "UPDATE customers SET debt_balance = debt_balance + ?, updated_at = ?, synced = 0 WHERE id = ?",
+                    ).run(debt, ts, customerId);
+                }
+            }
+
+            return { success: true, localId: saleId };
         } catch (e) {
-            console.error("sqlite-get-session-expected-balance error:", e);
+            console.error("Erreur save-offline-sale direct SQLite:", e);
             return { success: false, message: e.message };
         }
     });
 
-    // Compatibilité ascendante avec les anciens handlers offline_sales
-    ipcMain.handle("save-offline-sale", async (event, saleData) => {
-        // Redirigé vers la nouvelle table sync_queue
-        const ts = now();
-        const res = db.prepare("INSERT INTO sync_queue (entity_type, entity_local_id, operation, payload, created_at) VALUES (?,?,?,?,?)")
-          .run("sale_legacy", 0, "create", JSON.stringify(saleData), ts);
-        return { success: true, localId: Number(res.lastInsertRowid) };
-    });
-
     ipcMain.handle("get-offline-sales", async () => {
         try {
-            const rows = db.prepare("SELECT * FROM sync_queue WHERE entity_type = 'sale' AND synced = 0").all();
-            return rows.map(r => {
-                try {
-                    const d = JSON.parse(r.payload);
-                    d.localId = r.id;
-                    return d;
-                } catch { return null; }
-            }).filter(Boolean);
-        } catch { return []; }
+            // Récupérer toutes les ventes SQLite locales non synchronisées
+            const sales = db
+                .prepare("SELECT * FROM sales WHERE synced = 0")
+                .all();
+            const results = [];
+            for (const sale of sales) {
+                const items = db
+                    .prepare(
+                        `
+                    SELECT si.*, p.name as product_name FROM sale_items si
+                    LEFT JOIN products p ON p.id = si.product_id
+                    WHERE si.sale_id = ?
+                `,
+                    )
+                    .all(sale.id);
+                results.push({
+                    ...sale,
+                    localId: sale.id,
+                    items: items.map((item) => ({
+                        id: item.product_id,
+                        qty: item.quantity,
+                        price: item.unit_price,
+                        name: item.product_name,
+                    })),
+                });
+            }
+            return results;
+        } catch (e) {
+            console.error("Erreur get-offline-sales SQLite:", e);
+            return [];
+        }
     });
 
     ipcMain.handle("delete-offline-sales", async (event, localIds) => {
-        if (!Array.isArray(localIds) || localIds.length === 0) return { success: true };
-        const stmt = db.prepare("UPDATE sync_queue SET synced = 1 WHERE id = ?");
-        for (const id of localIds) stmt.run(id);
+        if (!Array.isArray(localIds) || localIds.length === 0)
+            return { success: true };
+        const ts = now();
+        const stmtSale = db.prepare(
+            "UPDATE sales SET synced = 1, updated_at = ? WHERE id = ?",
+        );
+        const stmtItems = db.prepare(
+            "UPDATE sale_items SET synced = 1, updated_at = ? WHERE sale_id = ?",
+        );
+        for (const id of localIds) {
+            stmtSale.run(ts, id);
+            stmtItems.run(ts, id);
+        }
         return { success: true };
     });
 }
 
 // ─── Démarrage Electron ────────────────────────────────────────────────────────
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
     setupPermissions();
     initDatabase();
+
+    try {
+        const response = await fetch(LOCAL_DEV_URL);
+        if (response) {
+            console.log("Serveur local déjà actif.");
+        }
+    } catch (err) {
+        console.log("Serveur local inactif. Lancement automatique...");
+        await startLocalPhpServer();
+    }
+
     createWindow();
+});
+
+app.on("will-quit", () => {
+    if (phpProcess) {
+        console.log("Arrêt du serveur PHP local...");
+        phpProcess.kill();
+    }
 });

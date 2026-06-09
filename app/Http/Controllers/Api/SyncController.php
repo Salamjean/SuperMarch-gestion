@@ -76,6 +76,8 @@ class SyncController extends Controller
                 // Paiements de dettes récents (30 derniers jours)
                 'debt_payments' => DebtPayment::where('created_at', '>=', now()->subDays(30))
                     ->get(),
+
+                'restock_requests' => RestockRequest::all(),
             ];
 
             return response()->json($data);
@@ -130,6 +132,26 @@ class SyncController extends Controller
 
                     case 'cash_session':
                         $this->applyCashSessionOperation($operation, $data);
+                        break;
+
+                    case 'product':
+                        $this->applyProductOperation($operation, $data);
+                        break;
+
+                    case 'category':
+                        $this->applyCategoryOperation($operation, $data);
+                        break;
+
+                    case 'supplier':
+                        $this->applySupplierOperation($operation, $data);
+                        break;
+
+                    case 'user':
+                        $this->applyUserOperation($operation, $data);
+                        break;
+
+                    case 'restock_request':
+                        $this->applyRestockRequestOperation($operation, $data);
                         break;
 
                     case 'sale_legacy':
@@ -368,5 +390,100 @@ class SyncController extends Controller
                 }
             }
         });
+    }
+
+    private function applyProductOperation(string $operation, array $data): void
+    {
+        if ($operation === 'create' || $operation === 'update') {
+            Product::updateOrCreate(['id' => $data['id']], [
+                'name' => $data['name'],
+                'slug' => $data['slug'] ?? Str::slug($data['name']),
+                'reference' => $data['reference'] ?? null,
+                'qr_code' => $data['qr_code'] ?? null,
+                'category_name' => $data['category_name'] ?? null,
+                'supplier_id' => $data['supplier_id'] ?? null,
+                'price' => $data['price'] ?? 0,
+                'stock' => $data['stock'] ?? 0,
+                'stock_threshold' => $data['stock_threshold'] ?? 5,
+                'image' => $data['image'] ?? null,
+                'description' => $data['description'] ?? null,
+                'is_active' => $data['is_active'] ?? 1,
+                'created_by' => $data['created_by'] ?? null,
+            ]);
+        } elseif ($operation === 'delete') {
+            Product::destroy($data['id']);
+        }
+    }
+
+    private function applyCategoryOperation(string $operation, array $data): void
+    {
+        if ($operation === 'create' || $operation === 'update') {
+            Category::updateOrCreate(['id' => $data['id']], [
+                'name' => $data['name'],
+                'slug' => $data['slug'] ?? Str::slug($data['name']),
+                'description' => $data['description'] ?? null,
+                'color' => $data['color'] ?? '#004d99',
+                'is_active' => $data['is_active'] ?? 1,
+                'created_by' => $data['created_by'] ?? null,
+            ]);
+        } elseif ($operation === 'delete') {
+            Category::destroy($data['id']);
+        }
+    }
+
+    private function applySupplierOperation(string $operation, array $data): void
+    {
+        if ($operation === 'create' || $operation === 'update') {
+            Supplier::updateOrCreate(['id' => $data['id']], [
+                'name' => $data['name'],
+                'email' => $data['email'] ?? null,
+                'phone' => $data['phone'] ?? null,
+                'contact_person' => $data['contact_person'] ?? null,
+                'address' => $data['address'] ?? null,
+                'city' => $data['city'] ?? null,
+                'website' => $data['website'] ?? null,
+                'is_active' => $data['is_active'] ?? 1,
+                'notes' => $data['notes'] ?? null,
+            ]);
+        } elseif ($operation === 'delete') {
+            Supplier::destroy($data['id']);
+        }
+    }
+
+    private function applyUserOperation(string $operation, array $data): void
+    {
+        if ($operation === 'create' || $operation === 'update') {
+            $userData = [
+                'name' => $data['name'],
+                'email' => $data['email'],
+                'role' => $data['role'] ?? 'employee',
+                'phone' => $data['phone'] ?? null,
+                'address' => $data['address'] ?? null,
+                'gender' => $data['gender'] ?? null,
+                'login_code' => $data['login_code'] ?? null,
+                'is_blocked' => $data['is_blocked'] ?? 0,
+            ];
+            if (!empty($data['password'])) {
+                $userData['password'] = $data['password'];
+            }
+            User::updateOrCreate(['id' => $data['id']], $userData);
+        } elseif ($operation === 'delete') {
+            User::destroy($data['id']);
+        }
+    }
+
+    private function applyRestockRequestOperation(string $operation, array $data): void
+    {
+        if ($operation === 'create' || $operation === 'update') {
+            RestockRequest::updateOrCreate(['id' => $data['id']], [
+                'product_id' => $data['product_id'] ?? null,
+                'user_id' => $data['user_id'] ?? null,
+                'status' => $data['status'] ?? 'pending',
+                'quantity_requested' => $data['quantity_requested'] ?? 0,
+                'quantity_received' => $data['quantity_received'] ?? 0,
+            ]);
+        } elseif ($operation === 'delete') {
+            RestockRequest::destroy($data['id']);
+        }
     }
 }

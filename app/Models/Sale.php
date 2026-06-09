@@ -10,16 +10,17 @@ class Sale extends Model
     use HasFactory;
 
     protected $fillable = [
-        'user_id', 
-        'total_amount', 
-        'payment_method', 
-        'reference', 
-        'amount_received', 
+        'user_id',
+        'total_amount',
+        'payment_method',
+        'reference',
+        'amount_received',
         'change_amount',
         'cash_session_id',
         'customer_id',
         'status',
-        'refunded_amount'
+        'refunded_amount',
+        'synced'
     ];
 
     public function items()

@@ -1,475 +1,551 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="fr">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SuperMarché - Mode Hors Connexion</title>
-    <style>
-        :root {
-            --bg-start: #080a16;
-            --bg-end: #140e2d;
-            --card-bg: rgba(22, 28, 45, 0.45);
-            --card-border: rgba(255, 255, 255, 0.08);
-            --text-primary: #f8fafc;
-            --text-secondary: #94a3b8;
-            --primary: #6366f1;
-            --primary-glow: rgba(99, 102, 241, 0.35);
-            --danger: #ef4444;
-            --danger-glow: rgba(239, 68, 68, 0.3);
-            --success: #10b981;
-        }
-
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-
-        body {
-            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            background: linear-gradient(135deg, var(--bg-start) 0%, var(--bg-end) 100%);
-            color: var(--text-primary);
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            overflow-x: hidden;
-            padding: 24px;
-        }
-
-        /* --- GRADIENT AMBIANT --- */
-        .ambient-glow {
-            position: absolute;
-            top: 40%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 500px;
-            height: 500px;
-            background: radial-gradient(circle, rgba(239, 68, 68, 0.08) 0%, rgba(99, 102, 241, 0.05) 50%, rgba(0, 0, 0, 0) 70%);
-            z-index: 1;
-            pointer-events: none;
-        }
-
-        /* --- GLASS CONTAINER --- */
-        .container {
-            width: 100%;
-            max-width: 560px;
-            background: var(--card-bg);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            border: 1px solid var(--card-border);
-            border-radius: 28px;
-            padding: 40px;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6),
-                        inset 0 1px 0 rgba(255, 255, 255, 0.05);
-            text-align: center;
-            position: relative;
-            z-index: 10;
-            animation: fadeIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-        }
-
-        /* --- LOGO ANIMÉ EN PANNE --- */
-        .logo-wrap {
-            position: relative;
-            width: 100px;
-            height: 100px;
-            margin: 0 auto 24px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            animation: bounceLogo 2.5s infinite ease-in-out;
-        }
-
-        .icon-container {
-            position: relative;
-            width: 86px;
-            height: 86px;
-            background: #ffffff;
-            border-radius: 26px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border: 1px solid rgba(255, 255, 255, 0.15);
-            box-shadow: 0 0 30px var(--danger-glow);
-            z-index: 2;
-            overflow: hidden;
-            padding: 8px;
-        }
-
-        .icon-container img {
-            width: 100%;
-            height: 100%;
-            object-fit: contain;
-            border-radius: 18px;
-        }
-
-        /* Cercle orbitant rouge pulsant autour de l'icône de caisse */
-        .orbit-ring {
-            position: absolute;
-            top: -4px;
-            left: -4px;
-            right: -4px;
-            bottom: -4px;
-            border-radius: 30px;
-            border: 2px solid transparent;
-            border-top: 2px solid var(--danger);
-            border-left: 2px solid var(--danger);
-            animation: rotateOrbit 2s linear infinite;
-            filter: drop-shadow(0 0 5px var(--danger-glow));
-            z-index: 1;
-        }
-
-        /* --- TYPOGRAPHIE --- */
-        h1 {
-            font-size: 24px;
-            font-weight: 800;
-            letter-spacing: -0.02em;
-            margin-bottom: 8px;
-            background: linear-gradient(to right, #ffffff, #fca5a5);
-            -webkit-background-clip: text;
-            background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-
-        .subtitle {
-            font-size: 14px;
-            color: var(--text-secondary);
-            margin-bottom: 25px;
-            line-height: 1.5;
-        }
-
-        /* --- BADGE HORS CONNEXION --- */
-        .status-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            background: rgba(239, 68, 68, 0.12);
-            color: #fca5a5;
-            padding: 8px 16px;
-            border-radius: 99px;
-            font-size: 12px;
-            font-weight: 700;
-            letter-spacing: 0.05em;
-            text-transform: uppercase;
-            border: 1px solid rgba(239, 68, 68, 0.2);
-            margin-bottom: 28px;
-        }
-
-        .status-dot {
-            width: 7px;
-            height: 7px;
-            background-color: var(--danger);
-            border-radius: 50%;
-            animation: pulse-dot 1.5s infinite ease-in-out;
-        }
-
-        /* --- LISTE DES SAUVEGARDES LOCALES --- */
-        .sqlite-card {
-            background: rgba(10, 12, 22, 0.5);
-            border: 1px solid var(--card-border);
-            border-radius: 20px;
-            padding: 20px;
-            margin-bottom: 28px;
-            text-align: left;
-        }
-
-        .sqlite-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 12px;
-            border-bottom: 1px dashed rgba(255, 255, 255, 0.08);
-            padding-bottom: 8px;
-        }
-
-        .sqlite-title {
-            font-size: 13.5px;
-            font-weight: 700;
-            color: var(--text-primary);
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .sqlite-title svg {
-            width: 16px;
-            height: 16px;
-            fill: var(--primary);
-        }
-
-        .sqlite-badge {
-            background: var(--primary-glow);
-            color: #c7d2fe;
-            font-size: 11px;
-            font-weight: 700;
-            padding: 3px 8px;
-            border-radius: 6px;
-            border: 1px solid rgba(99, 102, 241, 0.25);
-        }
-
-        .sqlite-list {
-            max-height: 140px;
-            overflow-y: auto;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            padding-right: 4px;
-        }
-
-        .sqlite-item {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            background: rgba(255, 255, 255, 0.02);
-            border: 1px solid rgba(255, 255, 255, 0.03);
-            padding: 8px 12px;
-            border-radius: 10px;
-            font-size: 12px;
-            animation: slideIn 0.4s ease forwards;
-        }
-
-        .sqlite-item-ref {
-            font-weight: 600;
-            color: var(--text-primary);
-        }
-
-        .sqlite-item-date {
-            color: var(--text-secondary);
-            font-size: 10px;
-            margin-top: 1px;
-        }
-
-        .sqlite-item-amount {
-            font-weight: 700;
-            color: var(--success);
-        }
-
-        .empty-sqlite {
-            text-align: center;
-            color: var(--text-secondary);
-            font-size: 12px;
-            padding: 15px 0;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 6px;
-        }
-
-        .empty-sqlite svg {
-            width: 20px;
-            height: 20px;
-            fill: var(--text-secondary);
-            opacity: 0.35;
-        }
-
-        /* --- BUTTONS --- */
-        .btn {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-            width: 100%;
-            background: var(--primary);
-            color: #ffffff;
-            border: none;
-            padding: 14px 28px;
-            border-radius: 14px;
-            font-size: 14.5px;
-            font-weight: 700;
-            cursor: pointer;
-            box-shadow: 0 10px 20px -5px var(--primary-glow);
-            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-        }
-
-        .btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 12px 22px -5px var(--primary-glow);
-            background: #4f46e5;
-        }
-
-        .btn:active {
-            transform: translateY(0);
-        }
-
-        .btn svg {
-            width: 16px;
-            height: 16px;
-            fill: currentColor;
-            transition: transform 0.6s ease;
-        }
-
-        .btn:hover svg {
-            transform: rotate(180deg);
-        }
-
-        /* --- LOADER BANNER (AUTO-SYNC) --- */
-        .loader-banner {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-            margin-top: 20px;
-            color: var(--text-secondary);
-            font-size: 12px;
-            font-weight: 500;
-        }
-
-        .spinner {
-            width: 14px;
-            height: 14px;
-            border: 2px solid rgba(255, 255, 255, 0.1);
-            border-top: 2px solid var(--primary);
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-
-        /* --- SCROLLBAR --- */
-        ::-webkit-scrollbar {
-            width: 4px;
-        }
-        ::-webkit-scrollbar-track {
-            background: transparent;
-        }
-        ::-webkit-scrollbar-thumb {
-            background: rgba(255, 255, 255, 0.08);
-            border-radius: 10px;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-            background: rgba(255, 255, 255, 0.15);
-        }
-
-        /* --- ANIMATIONS --- */
-        @keyframes rotateOrbit {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        @keyframes bounceLogo {
-            0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-5px); }
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(15px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        @keyframes pulse-dot {
-            0%, 100% { transform: scale(1); opacity: 1; }
-            50% { transform: scale(1.2); opacity: 0.6; }
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        @keyframes slideIn {
-            from { opacity: 0; transform: translateY(8px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-    </style>
-</head>
-<body>
-    <div class="ambient-glow"></div>
-
-    <div class="container">
-        <!-- Logo avec orbite rouge animée -->
-        <div class="logo-wrap">
-            <div class="icon-container">
-                <img src="logo/icon.png" alt="SuperGéo">
-            </div>
-            <div class="orbit-ring"></div>
-        </div>
-
-        <h1>Connexion Internet Perdue</h1>
-        
-        <p class="subtitle">
-            Impossible d'accéder au serveur principal. L'application est prête à enregistrer vos ventes en mode local.
-        </p>
-
-        <!-- Status Badge -->
-        <div class="status-badge" id="network-badge">
-            <span class="status-dot"></span>
-            <span id="network-text">Mode Hors Connexion</span>
-        </div>
-
-        <!-- Section des ventes en attente SQLite -->
-        <div class="sqlite-card">
-            <div class="sqlite-header">
-                <span class="sqlite-title">
-                    <svg viewBox="0 0 24 24">
-                        <path d="M12 2C6.48 2 2 4.02 2 6.5v11c0 2.48 4.48 4.5 10 4.5s10-2.02 10-4.5v-11C22 4.02 17.52 2 12 2zm0 18c-4.42 0-8-1.57-8-3.5V14.6c1.9 1.13 4.8 1.9 8 1.9s6.1-0.77 8-1.9v1.9c0 1.93-3.58 3.5-8 3.5zm0-4.5c-4.42 0-8-1.57-8-3.5V10.1c1.9 1.13 4.8 1.9 8 1.9s6.1-0.77 8-1.9v1.9c0 1.93-3.58 3.5-8 3.5zm0-4.5c-4.42 0-8-1.57-8-3.5V6.5c0 1.93 3.58 3.5 8 3.5s8-1.57 8-3.5V8.6c0 1.93-3.58 3.5-8 3.5zM4 6.5C4 4.57 7.58 3 12 3s8 1.57 8 3.5S16.42 10 12 10 4 8.43 4 6.5z"/>
-                    </svg>
-                    Sauvegardes Locales
-                </span>
-                <span class="sqlite-badge" id="sales-count">0 vente</span>
-            </div>
-            
-            <div class="sqlite-list" id="sales-list">
-                <div class="empty-sqlite">
-                    <svg viewBox="0 0 24 24">
-                        <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
-                    </svg>
-                    <span>Aucune vente en attente de synchronisation.</span>
-                </div>
-            </div>
-        </div>
-
-        <!-- Bouton de reconnexion manuelle -->
-        <button class="btn" onclick="retryConnection()">
-            <svg viewBox="0 0 24 24">
-                <path d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
-            </svg>
-            Réessayer de se connecter
-        </button>
-
-        <!-- Loader auto-reconnexion -->
-        <div class="loader-banner">
-            <div class="spinner"></div>
-            <span>Vérification automatique de la connexion...</span>
-        </div>
-    </div>
-
-    <script>
-        // Fonction principale pour tenter la reconnexion
-        async function retryConnection() {
-            const btn = document.querySelector('.btn');
-            btn.innerHTML = '<div class="spinner" style="border-top-color: white;"></div> Tentative de reconnexion...';
-            btn.disabled = true;
-
-            try {
-                // Tenter d'abord d'accéder au serveur local
-                const response = await fetch("http://127.0.0.1:8000", { method: 'GET', mode: 'no-cors', cache: 'no-store' });
-                if (response) {
-                    console.log("Serveur local disponible, redirection...");
-                    window.location.href = "http://127.0.0.1:8000";
-                    return;
-                }
-            } catch (e) {
-                console.log("Serveur local non joignable :", e.message);
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>SuperMarché - Mode Hors Connexion</title>
+        <style>
+            :root {
+                --bg-start: #080a16;
+                --bg-end: #140e2d;
+                --card-bg: rgba(22, 28, 45, 0.45);
+                --card-border: rgba(255, 255, 255, 0.08);
+                --text-primary: #f8fafc;
+                --text-secondary: #94a3b8;
+                --primary: #6366f1;
+                --primary-glow: rgba(99, 102, 241, 0.35);
+                --danger: #ef4444;
+                --danger-glow: rgba(239, 68, 68, 0.3);
+                --success: #10b981;
             }
 
-            // Sinon, rediriger vers le serveur en ligne
-            window.location.href = "https://fescads.com";
-        }
+            * {
+                box-sizing: border-box;
+                margin: 0;
+                padding: 0;
+            }
 
-        // Chargement des ventes SQLite locales
-        async function loadLocalSales() {
-            try {
-                if (window.electronAPI && typeof window.electronAPI.getOfflineSales === 'function') {
-                    const sales = await window.electronAPI.getOfflineSales();
-                    const count = Array.isArray(sales) ? sales.length : 0;
-                    
-                    document.getElementById('sales-count').textContent = `${count} vente${count > 1 ? 's' : ''}`;
-                    
-                    const listContainer = document.getElementById('sales-list');
-                    if (count > 0) {
-                        listContainer.innerHTML = sales.map((sale, index) => {
-                            const dateStr = sale.created_at ? new Date(sale.created_at).toLocaleString('fr-FR') : 'Date inconnue';
-                            const totalAmount = sale.total_amount ? parseInt(sale.total_amount).toLocaleString() : '0';
-                            const ref = sale.reference || `VENTE #${index + 1}`;
-                            return `
+            body {
+                font-family:
+                    system-ui,
+                    -apple-system,
+                    BlinkMacSystemFont,
+                    "Segoe UI",
+                    Roboto,
+                    sans-serif;
+                background: linear-gradient(
+                    135deg,
+                    var(--bg-start) 0%,
+                    var(--bg-end) 100%
+                );
+                color: var(--text-primary);
+                min-height: 100vh;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                overflow-x: hidden;
+                padding: 24px;
+            }
+
+            /* --- GRADIENT AMBIANT --- */
+            .ambient-glow {
+                position: absolute;
+                top: 40%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                width: 500px;
+                height: 500px;
+                background: radial-gradient(
+                    circle,
+                    rgba(239, 68, 68, 0.08) 0%,
+                    rgba(99, 102, 241, 0.05) 50%,
+                    rgba(0, 0, 0, 0) 70%
+                );
+                z-index: 1;
+                pointer-events: none;
+            }
+
+            /* --- GLASS CONTAINER --- */
+            .container {
+                width: 100%;
+                max-width: 560px;
+                background: var(--card-bg);
+                backdrop-filter: blur(20px);
+                -webkit-backdrop-filter: blur(20px);
+                border: 1px solid var(--card-border);
+                border-radius: 28px;
+                padding: 40px;
+                box-shadow:
+                    0 25px 50px -12px rgba(0, 0, 0, 0.6),
+                    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+                text-align: center;
+                position: relative;
+                z-index: 10;
+                animation: fadeIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            }
+
+            /* --- LOGO ANIMÉ EN PANNE --- */
+            .logo-wrap {
+                position: relative;
+                width: 100px;
+                height: 100px;
+                margin: 0 auto 24px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                animation: bounceLogo 2.5s infinite ease-in-out;
+            }
+
+            .icon-container {
+                position: relative;
+                width: 86px;
+                height: 86px;
+                background: #ffffff;
+                border-radius: 26px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                border: 1px solid rgba(255, 255, 255, 0.15);
+                box-shadow: 0 0 30px var(--danger-glow);
+                z-index: 2;
+                overflow: hidden;
+                padding: 8px;
+            }
+
+            .icon-container img {
+                width: 100%;
+                height: 100%;
+                object-fit: contain;
+                border-radius: 18px;
+            }
+
+            /* Cercle orbitant rouge pulsant autour de l'icône de caisse */
+            .orbit-ring {
+                position: absolute;
+                top: -4px;
+                left: -4px;
+                right: -4px;
+                bottom: -4px;
+                border-radius: 30px;
+                border: 2px solid transparent;
+                border-top: 2px solid var(--danger);
+                border-left: 2px solid var(--danger);
+                animation: rotateOrbit 2s linear infinite;
+                filter: drop-shadow(0 0 5px var(--danger-glow));
+                z-index: 1;
+            }
+
+            /* --- TYPOGRAPHIE --- */
+            h1 {
+                font-size: 24px;
+                font-weight: 800;
+                letter-spacing: -0.02em;
+                margin-bottom: 8px;
+                background: linear-gradient(to right, #ffffff, #fca5a5);
+                -webkit-background-clip: text;
+                background-clip: text;
+                -webkit-text-fill-color: transparent;
+            }
+
+            .subtitle {
+                font-size: 14px;
+                color: var(--text-secondary);
+                margin-bottom: 25px;
+                line-height: 1.5;
+            }
+
+            /* --- BADGE HORS CONNEXION --- */
+            .status-badge {
+                display: inline-flex;
+                align-items: center;
+                gap: 8px;
+                background: rgba(239, 68, 68, 0.12);
+                color: #fca5a5;
+                padding: 8px 16px;
+                border-radius: 99px;
+                font-size: 12px;
+                font-weight: 700;
+                letter-spacing: 0.05em;
+                text-transform: uppercase;
+                border: 1px solid rgba(239, 68, 68, 0.2);
+                margin-bottom: 28px;
+            }
+
+            .status-dot {
+                width: 7px;
+                height: 7px;
+                background-color: var(--danger);
+                border-radius: 50%;
+                animation: pulse-dot 1.5s infinite ease-in-out;
+            }
+
+            /* --- LISTE DES SAUVEGARDES LOCALES --- */
+            .sqlite-card {
+                background: rgba(10, 12, 22, 0.5);
+                border: 1px solid var(--card-border);
+                border-radius: 20px;
+                padding: 20px;
+                margin-bottom: 28px;
+                text-align: left;
+            }
+
+            .sqlite-header {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                margin-bottom: 12px;
+                border-bottom: 1px dashed rgba(255, 255, 255, 0.08);
+                padding-bottom: 8px;
+            }
+
+            .sqlite-title {
+                font-size: 13.5px;
+                font-weight: 700;
+                color: var(--text-primary);
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+
+            .sqlite-title svg {
+                width: 16px;
+                height: 16px;
+                fill: var(--primary);
+            }
+
+            .sqlite-badge {
+                background: var(--primary-glow);
+                color: #c7d2fe;
+                font-size: 11px;
+                font-weight: 700;
+                padding: 3px 8px;
+                border-radius: 6px;
+                border: 1px solid rgba(99, 102, 241, 0.25);
+            }
+
+            .sqlite-list {
+                max-height: 140px;
+                overflow-y: auto;
+                display: flex;
+                flex-direction: column;
+                gap: 8px;
+                padding-right: 4px;
+            }
+
+            .sqlite-item {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                background: rgba(255, 255, 255, 0.02);
+                border: 1px solid rgba(255, 255, 255, 0.03);
+                padding: 8px 12px;
+                border-radius: 10px;
+                font-size: 12px;
+                animation: slideIn 0.4s ease forwards;
+            }
+
+            .sqlite-item-ref {
+                font-weight: 600;
+                color: var(--text-primary);
+            }
+
+            .sqlite-item-date {
+                color: var(--text-secondary);
+                font-size: 10px;
+                margin-top: 1px;
+            }
+
+            .sqlite-item-amount {
+                font-weight: 700;
+                color: var(--success);
+            }
+
+            .empty-sqlite {
+                text-align: center;
+                color: var(--text-secondary);
+                font-size: 12px;
+                padding: 15px 0;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 6px;
+            }
+
+            .empty-sqlite svg {
+                width: 20px;
+                height: 20px;
+                fill: var(--text-secondary);
+                opacity: 0.35;
+            }
+
+            /* --- BUTTONS --- */
+            .btn {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                gap: 10px;
+                width: 100%;
+                background: var(--primary);
+                color: #ffffff;
+                border: none;
+                padding: 14px 28px;
+                border-radius: 14px;
+                font-size: 14.5px;
+                font-weight: 700;
+                cursor: pointer;
+                box-shadow: 0 10px 20px -5px var(--primary-glow);
+                transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            }
+
+            .btn:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 12px 22px -5px var(--primary-glow);
+                background: #4f46e5;
+            }
+
+            .btn:active {
+                transform: translateY(0);
+            }
+
+            .btn svg {
+                width: 16px;
+                height: 16px;
+                fill: currentColor;
+                transition: transform 0.6s ease;
+            }
+
+            .btn:hover svg {
+                transform: rotate(180deg);
+            }
+
+            /* --- LOADER BANNER (AUTO-SYNC) --- */
+            .loader-banner {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 10px;
+                margin-top: 20px;
+                color: var(--text-secondary);
+                font-size: 12px;
+                font-weight: 500;
+            }
+
+            .spinner {
+                width: 14px;
+                height: 14px;
+                border: 2px solid rgba(255, 255, 255, 0.1);
+                border-top: 2px solid var(--primary);
+                border-radius: 50%;
+                animation: spin 1s linear infinite;
+            }
+
+            /* --- SCROLLBAR --- */
+            ::-webkit-scrollbar {
+                width: 4px;
+            }
+            ::-webkit-scrollbar-track {
+                background: transparent;
+            }
+            ::-webkit-scrollbar-thumb {
+                background: rgba(255, 255, 255, 0.08);
+                border-radius: 10px;
+            }
+            ::-webkit-scrollbar-thumb:hover {
+                background: rgba(255, 255, 255, 0.15);
+            }
+
+            /* --- ANIMATIONS --- */
+            @keyframes rotateOrbit {
+                0% {
+                    transform: rotate(0deg);
+                }
+                100% {
+                    transform: rotate(360deg);
+                }
+            }
+
+            @keyframes bounceLogo {
+                0%,
+                100% {
+                    transform: translateY(0);
+                }
+                50% {
+                    transform: translateY(-5px);
+                }
+            }
+
+            @keyframes fadeIn {
+                from {
+                    opacity: 0;
+                    transform: translateY(15px);
+                }
+                to {
+                    opacity: 1;
+                    transform: translateY(0);
+                }
+            }
+
+            @keyframes pulse-dot {
+                0%,
+                100% {
+                    transform: scale(1);
+                    opacity: 1;
+                }
+                50% {
+                    transform: scale(1.2);
+                    opacity: 0.6;
+                }
+            }
+
+            @keyframes spin {
+                0% {
+                    transform: rotate(0deg);
+                }
+                100% {
+                    transform: rotate(360deg);
+                }
+            }
+
+            @keyframes slideIn {
+                from {
+                    opacity: 0;
+                    transform: translateY(8px);
+                }
+                to {
+                    opacity: 1;
+                    transform: translateY(0);
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <div class="ambient-glow"></div>
+
+        <div class="container">
+            <!-- Logo avec orbite rouge animée -->
+            <div class="logo-wrap">
+                <div class="icon-container">
+                    <img src="logo/icon.png" alt="SuperGéo" />
+                </div>
+                <div class="orbit-ring"></div>
+            </div>
+
+            <h1>Connexion Internet Perdue</h1>
+
+            <p class="subtitle">
+                Impossible d'accéder au serveur principal. L'application est
+                prête à enregistrer vos ventes en mode local.
+            </p>
+
+            <!-- Status Badge -->
+            <div class="status-badge" id="network-badge">
+                <span class="status-dot"></span>
+                <span id="network-text">Mode Hors Connexion</span>
+            </div>
+
+            <!-- Section des ventes en attente SQLite -->
+            <div class="sqlite-card">
+                <div class="sqlite-header">
+                    <span class="sqlite-title">
+                        <svg viewBox="0 0 24 24">
+                            <path
+                                d="M12 2C6.48 2 2 4.02 2 6.5v11c0 2.48 4.48 4.5 10 4.5s10-2.02 10-4.5v-11C22 4.02 17.52 2 12 2zm0 18c-4.42 0-8-1.57-8-3.5V14.6c1.9 1.13 4.8 1.9 8 1.9s6.1-0.77 8-1.9v1.9c0 1.93-3.58 3.5-8 3.5zm0-4.5c-4.42 0-8-1.57-8-3.5V10.1c1.9 1.13 4.8 1.9 8 1.9s6.1-0.77 8-1.9v1.9c0 1.93-3.58 3.5-8 3.5zm0-4.5c-4.42 0-8-1.57-8-3.5V6.5c0 1.93 3.58 3.5 8 3.5s8-1.57 8-3.5V8.6c0 1.93-3.58 3.5-8 3.5zM4 6.5C4 4.57 7.58 3 12 3s8 1.57 8 3.5S16.42 10 12 10 4 8.43 4 6.5z"
+                            />
+                        </svg>
+                        Sauvegardes Locales
+                    </span>
+                    <span class="sqlite-badge" id="sales-count">0 vente</span>
+                </div>
+
+                <div class="sqlite-list" id="sales-list">
+                    <div class="empty-sqlite">
+                        <svg viewBox="0 0 24 24">
+                            <path
+                                d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"
+                            />
+                        </svg>
+                        <span>Aucune vente en attente de synchronisation.</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bouton de reconnexion manuelle -->
+            <button class="btn" onclick="retryConnection()">
+                <svg viewBox="0 0 24 24">
+                    <path
+                        d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"
+                    />
+                </svg>
+                Réessayer de se connecter
+            </button>
+
+            <!-- Loader auto-reconnexion -->
+            <div class="loader-banner">
+                <div class="spinner"></div>
+                <span>Vérification automatique de la connexion...</span>
+            </div>
+        </div>
+
+        <script>
+            // Fonction principale pour tenter la reconnexion
+            async function retryConnection() {
+                const btn = document.querySelector(".btn");
+                btn.innerHTML =
+                    '<div class="spinner" style="border-top-color: white;"></div> Tentative de reconnexion...';
+                btn.disabled = true;
+
+                try {
+                    // Tenter d'abord d'accéder au serveur local
+                    const response = await fetch("http://127.0.0.1:8000", {
+                        method: "GET",
+                        mode: "no-cors",
+                        cache: "no-store",
+                    });
+                    if (response) {
+                        console.log("Serveur local disponible, redirection...");
+                        window.location.href = "http://127.0.0.1:8000";
+                        return;
+                    }
+                } catch (e) {
+                    console.log("Serveur local non joignable :", e.message);
+                }
+
+                // Sinon, rediriger vers le serveur local car on travaille en local
+                window.location.href = "http://127.0.0.1:8000";
+            }
+
+            // Chargement des ventes SQLite locales
+            async function loadLocalSales() {
+                try {
+                    if (
+                        window.electronAPI &&
+                        typeof window.electronAPI.getOfflineSales === "function"
+                    ) {
+                        const sales =
+                            await window.electronAPI.getOfflineSales();
+                        const count = Array.isArray(sales) ? sales.length : 0;
+
+                        document.getElementById("sales-count").textContent =
+                            `${count} vente${count > 1 ? "s" : ""}`;
+
+                        const listContainer =
+                            document.getElementById("sales-list");
+                        if (count > 0) {
+                            listContainer.innerHTML = sales
+                                .map((sale, index) => {
+                                    const dateStr = sale.created_at
+                                        ? new Date(
+                                              sale.created_at,
+                                          ).toLocaleString("fr-FR")
+                                        : "Date inconnue";
+                                    const totalAmount = sale.total_amount
+                                        ? parseInt(
+                                              sale.total_amount,
+                                          ).toLocaleString()
+                                        : "0";
+                                    const ref =
+                                        sale.reference || `VENTE #${index + 1}`;
+                                    return `
                                 <div class="sqlite-item" style="animation-delay: ${index * 0.05}s">
                                     <div>
                                         <div class="sqlite-item-ref">${ref}</div>
@@ -478,35 +554,39 @@
                                     <div class="sqlite-item-amount">${totalAmount} FCFA</div>
                                 </div>
                             `;
-                        }).join('');
+                                })
+                                .join("");
+                        }
                     }
+                } catch (err) {
+                    console.error(
+                        "Impossible de charger les ventes SQLite locales :",
+                        err,
+                    );
                 }
-            } catch (err) {
-                console.error("Impossible de charger les ventes SQLite locales :", err);
             }
-        }
 
-        // Détection de la reconnexion automatique en temps réel
-        window.addEventListener('online', () => {
-            const badge = document.getElementById('network-badge');
-            const badgeText = document.getElementById('network-text');
-            const dot = badge.querySelector('.status-dot');
+            // Détection de la reconnexion automatique en temps réel
+            window.addEventListener("online", () => {
+                const badge = document.getElementById("network-badge");
+                const badgeText = document.getElementById("network-text");
+                const dot = badge.querySelector(".status-dot");
 
-            badge.style.background = 'rgba(16, 185, 129, 0.12)';
-            badge.style.color = '#a7f3d0';
-            badge.style.borderColor = 'rgba(16, 185, 129, 0.2)';
-            dot.style.backgroundColor = '#10b981';
-            badgeText.textContent = "Internet rétabli ! Reconnexion...";
+                badge.style.background = "rgba(16, 185, 129, 0.12)";
+                badge.style.color = "#a7f3d0";
+                badge.style.borderColor = "rgba(16, 185, 129, 0.2)";
+                dot.style.backgroundColor = "#10b981";
+                badgeText.textContent = "Internet rétabli ! Reconnexion...";
 
-            setTimeout(() => {
-                window.location.href = "https://fescads.com";
-            }, 1200);
-        });
+                setTimeout(() => {
+                    window.location.href = "http://127.0.0.1:8000";
+                }, 1200);
+            });
 
-        document.addEventListener('DOMContentLoaded', () => {
-            loadLocalSales();
-            setInterval(loadLocalSales, 5000);
-        });
-    </script>
-</body>
+            document.addEventListener("DOMContentLoaded", () => {
+                loadLocalSales();
+                setInterval(loadLocalSales, 5000);
+            });
+        </script>
+    </body>
 </html>

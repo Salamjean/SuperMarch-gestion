@@ -13,6 +13,7 @@ class Category extends Model
         'color',
         'is_active',
         'created_by',
+        'synced',
     ];
 
     protected $casts = [

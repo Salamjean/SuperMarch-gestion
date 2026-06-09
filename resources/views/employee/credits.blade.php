@@ -106,111 +106,45 @@ function payCustomerDebtModal(id, name, maxDebt) {
                 return `Le montant ne peut pas dépasser la dette actuelle (${parseFloat(maxDebt).toLocaleString()} FCFA)`
             }
         }
-    }).then(async (result) => {
+    }).then((result) => {
         if (result.isConfirmed && result.value) {
             const amount = parseFloat(result.value);
+            const routeUrl = "{{ route('employee.customers.pay-debt', ':id') }}".replace(':id', id);
             
-            // Détecter l'environnement
-            const isElectron = typeof window.electronAPI !== 'undefined';
-            
-            // Détection de connexion
-            let isCurrentlyOnline = navigator.onLine;
-            if (typeof checkActualConnection === 'function') {
-                isCurrentlyOnline = await checkActualConnection();
-            }
-            
-            let localSuccess = false;
-            let currentUserId = {{ auth()->id() ?? 'null' }};
-            let activeSessionId = null;
-            
-            if (isElectron) {
-                try {
-                    // Trouver la session de caisse active locale
-                    const activeSession = await window.electronAPI.invoke('sqlite-get-active-session', currentUserId);
-                    if (activeSession) activeSessionId = activeSession.id;
-                    
-                    const localResult = await window.electronAPI.invoke('sqlite-pay-debt', {
-                        customerId: id,
-                        userId: currentUserId,
-                        cashSessionId: activeSessionId,
-                        amount: amount
-                    });
-                    
-                    if (localResult.success) {
-                        localSuccess = true;
-                        console.log("Règlement de dette enregistré localement dans SQLite :", localResult);
-                    } else {
-                        throw new Error(localResult.message);
-                    }
-                } catch (err) {
-                    console.error("Erreur remboursement SQLite :", err);
-                    Swal.fire('Erreur Locale !', 'Impossible de valider le remboursement localement dans SQLite : ' + err.message, 'error');
-                    return;
-                }
-            }
-            
-            if (isCurrentlyOnline) {
-                const routeUrl = "{{ route('employee.customers.pay-debt', ':id') }}".replace(':id', id);
-                
-                fetch(routeUrl, {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        "X-CSRF-TOKEN": "{{ csrf_token() }}"
-                    },
-                    body: JSON.stringify({ amount: amount })
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        if (isElectron) {
-                            // Déclencher immédiatement la synchronisation
-                            window.electronAPI.invoke('sqlite-push', {
-                                baseUrl: window.location.origin,
-                                sessionCookie: document.cookie
-                            }).catch(() => {});
-                        }
-                        Swal.fire({
-                            icon: 'success',
-                            title: 'Enregistré !',
-                            text: data.message,
-                            confirmButtonColor: 'var(--primary)'
-                        }).then(() => {
-                            location.reload();
-                        });
-                    } else {
-                        Swal.fire({
-                            icon: 'error',
-                            title: 'Échec',
-                            text: data.message,
-                            confirmButtonColor: 'var(--primary)'
-                        });
-                    }
-                })
-                .catch(error => {
-                    console.error("Erreur serveur payDebt:", error);
-                    if (isElectron && localSuccess) {
-                        Swal.fire('Mode Hors-ligne', 'Règlement enregistré localement. Il sera envoyé au serveur plus tard.', 'success').then(() => {
-                            location.reload();
-                        });
-                    } else {
-                        Swal.fire({
-                            icon: 'error',
-                            title: 'Erreur',
-                            text: 'Une erreur est survenue lors de l\'enregistrement du remboursement.',
-                            confirmButtonColor: 'var(--primary)'
-                        });
-                    }
-                });
-            } else {
-                if (isElectron && localSuccess) {
-                    Swal.fire('Mode Hors-ligne', 'Règlement enregistré localement. Les données seront synchronisées au retour de la connexion.', 'success').then(() => {
+            Swal.fire({
+                title: 'Enregistrement...',
+                text: 'Veuillez patienter',
+                allowOutsideClick: false,
+                didOpen: () => { Swal.showLoading(); }
+            });
+
+            fetch(routeUrl, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRF-TOKEN": "{{ csrf_token() }}"
+                },
+                body: JSON.stringify({ amount: amount })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Enregistré !',
+                        text: data.message,
+                        confirmButtonColor: 'var(--primary)'
+                    }).then(() => {
                         location.reload();
                     });
                 } else {
-                    Swal.fire('Hors-ligne', 'Connexion internet requise pour enregistrer le remboursement.', 'error');
+                    Swal.fire('Erreur', data.message, 'error');
                 }
-            }
+            })
+            .catch(err => {
+                console.error("Erreur remboursement:", err);
+                Swal.fire('Erreur', 'Impossible de valider le remboursement.', 'error');
+            });
         }
     });
 }

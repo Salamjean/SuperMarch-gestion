@@ -23,6 +23,7 @@ class Product extends Model
         'reference',
         'is_active',
         'created_by',
+        'synced',
     ];
 
     public function supplier()
