@@ -1,5 +1,6 @@
 import { app, BrowserWindow, shell, session, ipcMain } from "electron";
 import path from "path";
+import fs from "fs";
 import { fileURLToPath } from "url";
 import { DatabaseSync } from "node:sqlite";
 
@@ -162,7 +163,17 @@ let db;
 
 function initDatabase() {
     try {
-        const dbPath = path.join(__dirname, "database", "database_local.sqlite");
+        let dbPath;
+        if (app.isPackaged) {
+            const userDataPath = app.getPath("userData");
+            const dbDir = path.join(userDataPath, "database");
+            if (!fs.existsSync(dbDir)) {
+                fs.mkdirSync(dbDir, { recursive: true });
+            }
+            dbPath = path.join(dbDir, "database_local.sqlite");
+        } else {
+            dbPath = path.join(__dirname, "database", "database_local.sqlite");
+        }
         console.log("SQLite locale initialisée :", dbPath);
         db = new DatabaseSync(dbPath);
 
