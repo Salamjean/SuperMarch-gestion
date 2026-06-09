@@ -3,37 +3,52 @@
 @section('title', 'Interface Caisse')
 
 @section('content')
-    @if (!$activeSession)
-        <!-- Overlay d'ouverture de caisse -->
-        <div class="session-gate"
-            style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(10px); z-index: 9999; display: flex; align-items: center; justify-content: center; color: white;">
-            <div class="gate-card"
-                style="background: #1e293b; border: 1px solid #334155; border-radius: 20px; padding: 40px; width: 100%; max-width: 450px; text-align: center; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);">
-                <div
-                    style="background: rgba(99, 102, 241, 0.15); width: 80px; height: 80px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px;">
-                    <i class="fa-solid fa-cash-register" style="font-size: 36px; color: #6366f1;"></i>
-                </div>
-                <h2 style="margin: 0 0 10px; font-size: 24px; font-weight: 700;">Ouverture de la Caisse</h2>
-                <p style="color: #94a3b8; font-size: 14px; margin: 0 0 30px;">Veuillez déclarer le montant du fond de caisse
-                    initial disponible dans le tiroir-caisse pour démarrer votre journée.</p>
+    <!-- Overlay d'ouverture de caisse (géré dynamiquement) -->
+    <div class="session-gate" id="session-gate"
+        style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(10px); z-index: 9999; display: {{ !$activeSession ? 'flex' : 'none' }}; align-items: center; justify-content: center; color: white;">
+        <div class="gate-card"
+            style="background: #1e293b; border: 1px solid #334155; border-radius: 20px; padding: 40px; width: 100%; max-width: 450px; text-align: center; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);">
+            <div
+                style="background: rgba(99, 102, 241, 0.15); width: 80px; height: 80px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px;">
+                <i class="fa-solid fa-cash-register" style="font-size: 36px; color: #6366f1;"></i>
+            </div>
+            <h2 style="margin: 0 0 10px; font-size: 24px; font-weight: 700;">Ouverture de la Caisse</h2>
+            <p style="color: #94a3b8; font-size: 14px; margin: 0 0 30px;">Veuillez déclarer le montant du fond de caisse
+                initial disponible dans le tiroir-caisse pour démarrer votre journée.</p>
 
-                <form id="open-session-form" onsubmit="submitOpenSession(event)">
-                    <div style="text-align: left; margin-bottom: 20px;">
-                        <label for="opening_balance"
-                            style="display: block; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #94a3b8; margin-bottom: 8px;">Fond
-                            de caisse initial (FCFA)</label>
-                        <input type="number" id="opening_balance" required min="0" value="0"
-                            style="width: 100%; background: #0f172a; border: 1px solid #334155; border-radius: 12px; padding: 12px 16px; color: white; font-size: 18px; font-weight: 600; text-align: center; outline: none; transition: border-color 0.2s;"
-                            placeholder="0 FCFA" autofocus>
-                    </div>
+            <form id="open-session-form" onsubmit="submitOpenSession(event)">
+                <div style="text-align: left; margin-bottom: 20px;">
+                    <label for="opening_balance"
+                        style="display: block; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #94a3b8; margin-bottom: 8px;">Fond
+                        de caisse initial (FCFA)</label>
+                    <input type="number" id="opening_balance" required min="0" value="0"
+                        style="width: 100%; background: #0f172a; border: 1px solid #334155; border-radius: 12px; padding: 12px 16px; color: white; font-size: 18px; font-weight: 600; text-align: center; outline: none; transition: border-color 0.2s;"
+                        placeholder="0 FCFA" autofocus>
+                </div>
+                <button type="submit"
+                    style="width: 100%; background: #6366f1; color: white; border: none; border-radius: 12px; padding: 14px; font-size: 16px; font-weight: 600; cursor: pointer; transition: background 0.2s; display: flex; align-items: center; justify-content: center; gap: 10px;"
+                    onmouseover="this.style.background='#4f46e5'" onmouseout="this.style.background='#6366f1'">
+                    <i class="fa-solid fa-play"></i> DÉMARRER LA SESSION
+                </button>
+            </form>
+
+            <!-- Bouton de retour à la connexion -->
+            <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #334155;">
+                <form method="POST" action="{{ route('logout') }}">
+                    @csrf
+                    @method('DELETE')
                     <button type="submit"
-                        style="width: 100%; background: #6366f1; color: white; border: none; border-radius: 12px; padding: 14px; font-size: 16px; font-weight: 600; cursor: pointer; transition: background 0.2s; display: flex; align-items: center; justify-content: center; gap: 10px;">
-                        <i class="fa-solid fa-play"></i> DÉMARRER LA SESSION
+                        style="width: 100%; background: transparent; color: #94a3b8; border: 1px solid #334155; border-radius: 12px; padding: 12px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px;"
+                        onmouseover="this.style.background='rgba(239,68,68,0.1)'; this.style.color='#f87171'; this.style.borderColor='rgba(239,68,68,0.4)'"
+                        onmouseout="this.style.background='transparent'; this.style.color='#94a3b8'; this.style.borderColor='#334155'">
+                        <i class="fa-solid fa-arrow-right-from-bracket"></i>
+                        Changer de compte / Se déconnecter
                     </button>
                 </form>
             </div>
         </div>
-    @endif
+    </div>
+
 
     <!-- POS Central (Caisse View) -->
     <main class="pos-center" id="view-caisse">
@@ -47,14 +62,12 @@
                 <i class="fa-solid fa-list-check"></i>
                 <span>Voir Non-Enrôlés</span>
             </button>
-            @if ($activeSession)
-                <button class="close-session-btn" onclick="showCloseSessionModal()"
-                    style="background: #ef4444; color: white; border: none; padding: 10px 18px; border-radius: 12px; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 13px; transition: background 0.2s; white-space: nowrap;"
-                    onmouseover="this.style.background='#dc2626'" onmouseout="this.style.background='#ef4444'">
-                    <i class="fa-solid fa-shop-slash"></i>
-                    <span>Fermer la caisse</span>
-                </button>
-            @endif
+            <button class="close-session-btn" id="close-session-btn" onclick="showCloseSessionModal()"
+                style="background: #ef4444; color: white; border: none; padding: 10px 18px; border-radius: 12px; font-weight: bold; cursor: pointer; display: {{ $activeSession ? 'flex' : 'none' }}; align-items: center; gap: 8px; font-size: 13px; transition: background 0.2s; white-space: nowrap;"
+                onmouseover="this.style.background='#dc2626'" onmouseout="this.style.background='#ef4444'">
+                <i class="fa-solid fa-shop-slash"></i>
+                <span>Fermer la caisse</span>
+            </button>
         </div>
 
         <div class="category-filter">
@@ -779,7 +792,24 @@
                     }
                 });
 
+                const isElectron = typeof window.electronAPI !== 'undefined';
+                let currentUserId = {{ auth()->id() ?? 'null' }};
+                let currentSessionId = {{ $activeSession->id ?? 'null' }};
+
+                if (isElectron) {
+                    try {
+                        const localSession = await window.electronAPI.invoke('sqlite-get-active-session', currentUserId);
+                        if (localSession) {
+                            currentSessionId = localSession.id;
+                        }
+                    } catch (e) {
+                        console.error("Erreur de récupération de session active SQLite:", e);
+                    }
+                }
+
                 const offlineSale = {
+                    userId: currentUserId,
+                    cashSessionId: currentSessionId,
                     items: cart,
                     total_amount: total,
                     amount_received: received,
@@ -1092,25 +1122,63 @@
                 confirmButtonText: 'Oui, annuler la vente',
                 cancelButtonText: 'Non, conserver',
                 showLoaderOnConfirm: true,
-                preConfirm: () => {
-                    return fetch(`/employee/pos/sales/${saleId}/refund`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-CSRF-TOKEN': '{{ csrf_token() }}'
-                        }
-                    })
-                        .then(response => {
-                            if (!response.ok) {
-                                return response.json().then(err => {
-                                    throw new Error(err.message || response.statusText);
-                                });
+                preConfirm: async () => {
+                    let isCurrentlyOnline = navigator.onLine;
+                    if (typeof checkActualConnection === 'function') {
+                        isCurrentlyOnline = await checkActualConnection();
+                    }
+
+                    const isElectron = typeof window.electronAPI !== 'undefined';
+                    const currentUserId = {{ auth()->id() ?? 'null' }};
+
+                    if (isElectron) {
+                        try {
+                            const localResult = await window.electronAPI.invoke('sqlite-refund-sale', {
+                                saleId: saleId,
+                                userId: currentUserId
+                            });
+                            if (!localResult.success) {
+                                throw new Error(localResult.message);
                             }
-                            return response.json();
+                            console.log("Vente annulée localement dans SQLite.");
+                        } catch (err) {
+                            console.error("Erreur remboursement SQLite :", err);
+                            Swal.showValidationMessage(`Erreur locale SQLite : ${err.message}`);
+                            return false;
+                        }
+                    }
+
+                    if (isCurrentlyOnline) {
+                        return fetch(`/employee/pos/sales/${saleId}/refund`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                            }
                         })
-                        .catch(error => {
-                            Swal.showValidationMessage(`Erreur: ${error.message || error}`);
-                        });
+                            .then(response => {
+                                if (!response.ok) {
+                                    return response.json().then(err => {
+                                        throw new Error(err.message || response.statusText);
+                                    });
+                                }
+                                return response.json();
+                            })
+                            .catch(error => {
+                                if (isElectron) {
+                                    return { success: true, message: 'Vente annulée localement (sera synchronisée).' };
+                                }
+                                Swal.showValidationMessage(`Erreur: ${error.message || error}`);
+                                return false;
+                            });
+                    } else {
+                        if (isElectron) {
+                            return { success: true, message: 'Vente annulée localement (sera synchronisée).' };
+                        } else {
+                            Swal.showValidationMessage('Connexion internet requise pour annuler la vente.');
+                            return false;
+                        }
+                    }
                 }
             }).then((result) => {
                 if (result.isConfirmed && result.value.success) {
@@ -1818,9 +1886,15 @@
         }
 
         // --- SESSION DE CAISSE ---
-        function submitOpenSession(event) {
+        async function submitOpenSession(event) {
             event.preventDefault();
-            const openingBalance = document.getElementById('opening_balance').value;
+            const openingBalance = parseFloat(document.getElementById('opening_balance').value || 0);
+
+            const currentUserId = {{ auth()->id() ?? 'null' }};
+            if (!currentUserId) {
+                Swal.fire('Erreur d\'authentification', 'Utilisateur non identifié. Veuillez vous reconnecter.', 'error');
+                return;
+            }
 
             Swal.fire({
                 title: 'Initialisation de la caisse...',
@@ -1830,40 +1904,113 @@
                 }
             });
 
-            fetch('{{ route('employee.pos.session.open') }}', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': '{{ csrf_token() }}'
-                },
-                body: JSON.stringify({
-                    opening_balance: openingBalance
-                })
-            })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        Swal.fire('Succès!', data.message, 'success').then(() => {
-                            location.reload();
-                        });
-                    } else {
-                        Swal.fire('Erreur!', data.message, 'error');
+            // Détection de connexion
+            let isCurrentlyOnline = navigator.onLine;
+            if (typeof checkActualConnection === 'function') {
+                isCurrentlyOnline = await checkActualConnection();
+            }
+
+            const isElectron = typeof window.electronAPI !== 'undefined';
+
+            if (isElectron) {
+                // 1. Ouvrir localement dans SQLite pour pouvoir vendre hors-ligne
+                try {
+                    const localResult = await window.electronAPI.invoke('sqlite-open-session', {
+                        userId: currentUserId,
+                        openingBalance: openingBalance
+                    });
+                    
+                    if (!localResult.success && !localResult.message.includes("déjà active")) {
+                        throw new Error(localResult.message);
                     }
+                    console.log("Session ouverte localement dans SQLite :", localResult);
+                } catch (err) {
+                    console.error("Erreur d'ouverture locale SQLite :", err);
+                    Swal.fire('Erreur Locale !', 'Impossible d\'ouvrir la caisse localement dans SQLite : ' + err.message, 'error');
+                    return;
+                }
+            }
+
+            // 2. Si en ligne, ouvrir aussi sur le serveur MySQL
+            if (isCurrentlyOnline) {
+                fetch('{{ route('employee.pos.session.open') }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                    },
+                    body: JSON.stringify({
+                        opening_balance: openingBalance
+                    })
                 })
-                .catch(error => {
-                    Swal.fire('Erreur!', 'Une erreur est survenue lors de l\'ouverture de caisse.', 'error');
-                });
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success || (data.message && data.message.includes("déjà active"))) {
+                            Swal.fire('Succès !', data.message || 'Caisse ouverte avec succès.', 'success').then(() => {
+                                location.reload();
+                            });
+                        } else {
+                            Swal.fire('Erreur !', data.message, 'error');
+                        }
+                    })
+                    .catch(error => {
+                        console.error("Erreur serveur openSession:", error);
+                        if (isElectron) {
+                            const gate = document.getElementById('session-gate');
+                            const closeBtn = document.getElementById('close-session-btn');
+                            if (gate) gate.style.display = 'none';
+                            if (closeBtn) closeBtn.style.display = 'flex';
+                            Swal.fire('Mode Hors-ligne activé', 'La caisse est ouverte localement. Les données seront synchronisées ultérieurement.', 'info');
+                        } else {
+                            Swal.fire('Erreur !', 'Une erreur est survenue lors de l\'ouverture de caisse sur le serveur.', 'error');
+                        }
+                    });
+            } else {
+                // Si hors-ligne
+                if (isElectron) {
+                    const gate = document.getElementById('session-gate');
+                    const closeBtn = document.getElementById('close-session-btn');
+                    if (gate) gate.style.display = 'none';
+                    if (closeBtn) closeBtn.style.display = 'flex';
+                    Swal.fire('Mode Hors-ligne', 'Caisse ouverte localement. Les ventes seront synchronisées au retour de la connexion.', 'success');
+                } else {
+                    Swal.fire('Hors-ligne', 'Connexion internet requise pour ouvrir la caisse.', 'error');
+                }
+            }
         }
 
-        function showCloseSessionModal() {
-            const expected = {{ $expectedClosingBalance ?? 0 }};
+        async function showCloseSessionModal() {
+            let expected = {{ $expectedClosingBalance ?? 0 }};
+            let openingBalance = {{ $activeSession->opening_balance ?? 0 }};
+            let totalSales = {{ (($expectedClosingBalance ?? 0) - ($activeSession->opening_balance ?? 0)) }};
+            
+            const isElectron = typeof window.electronAPI !== 'undefined';
+            const currentUserId = {{ auth()->id() ?? 'null' }};
+            let localSessionId = null;
+
+            if (isElectron) {
+                try {
+                    const localSession = await window.electronAPI.invoke('sqlite-get-active-session', currentUserId);
+                    if (localSession) {
+                        localSessionId = localSession.id;
+                        const localSummary = await window.electronAPI.invoke('sqlite-get-session-expected-balance', localSessionId);
+                        if (localSummary.success) {
+                            openingBalance = localSummary.openingBalance;
+                            totalSales = localSummary.totalSales;
+                            expected = localSummary.expectedClosingBalance;
+                        }
+                    }
+                } catch (e) {
+                    console.error("Erreur de calcul du solde attendu SQLite:", e);
+                }
+            }
 
             Swal.fire({
                 title: 'Clôture de la caisse',
                 html: `
                             <div style="text-align: left; font-size: 14px;">
-                                <p style="margin-bottom: 8px;">Fond initial : <b>{{ number_format($activeSession->opening_balance ?? 0, 0, ',', ' ') }} FCFA</b></p>
-                                <p style="margin-bottom: 15px;">Ventes enregistrées : <b>{{ number_format(($expectedClosingBalance ?? 0) - ($activeSession->opening_balance ?? 0), 0, ',', ' ') }} FCFA</b></p>
+                                <p style="margin-bottom: 8px;">Fond initial : <b>${openingBalance.toLocaleString()} FCFA</b></p>
+                                <p style="margin-bottom: 15px;">Ventes enregistrées : <b>${totalSales.toLocaleString()} FCFA</b></p>
                                 <div style="border-top: 1px solid #eee; margin: 15px 0; padding-top: 15px;">
                                     <span style="font-size: 16px; font-weight: bold; color: var(--primary);">Total attendu en caisse : <b>${expected.toLocaleString()} FCFA</b></span>
                                 </div>
@@ -1886,7 +2033,7 @@
                     }
                     return actual;
                 }
-            }).then((result) => {
+            }).then(async (result) => {
                 if (result.isConfirmed) {
                     const actualBalance = result.value;
 
@@ -1898,54 +2045,102 @@
                         }
                     });
 
-                    fetch('{{ route('employee.pos.session.close') }}', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-CSRF-TOKEN': '{{ csrf_token() }}'
-                        },
-                        body: JSON.stringify({
-                            actual_closing_balance: actualBalance
-                        })
-                    })
-                        .then(response => response.json())
-                        .then(data => {
-                            if (data.success) {
-                                const session = data.session;
-                                const diff = parseFloat(session.difference);
-                                let diffText = '';
+                    // Détection de connexion
+                    let isCurrentlyOnline = navigator.onLine;
+                    if (typeof checkActualConnection === 'function') {
+                        isCurrentlyOnline = await checkActualConnection();
+                    }
 
-                                if (diff === 0) {
-                                    diffText =
-                                        '<span style="color: green; font-weight: bold;">Caisse équilibrée (0 FCFA d\'écart)</span>';
-                                } else if (diff > 0) {
-                                    diffText =
-                                        `<span style="color: blue; font-weight: bold;">Excédent de caisse de +${diff.toLocaleString()} FCFA</span>`;
-                                } else {
-                                    diffText =
-                                        `<span style="color: red; font-weight: bold;">Déficit de caisse de ${diff.toLocaleString()} FCFA</span>`;
-                                }
+                    const isElectron = typeof window.electronAPI !== 'undefined';
+                    const currentUserId = {{ auth()->id() ?? 'null' }};
 
-                                Swal.fire({
-                                    title: 'Caisse clôturée !',
-                                    html: `
-                                            <div style="text-align: left; font-size: 14px;">
-                                                <p>Attendu : <b>${parseFloat(session.expected_closing_balance).toLocaleString()} FCFA</b></p>
-                                                <p>Compté : <b>${parseFloat(session.actual_closing_balance).toLocaleString()} FCFA</b></p>
-                                                <p style="margin-top:10px;">Résultat : ${diffText}</p>
-                                            </div>
-                                        `,
-                                    icon: 'success'
-                                }).then(() => {
-                                    location.reload();
-                                });
-                            } else {
-                                Swal.fire('Erreur!', data.message, 'error');
+                    if (isElectron) {
+                        try {
+                            const localResult = await window.electronAPI.invoke('sqlite-close-session', {
+                                userId: currentUserId,
+                                actualClosingBalance: parseFloat(actualBalance)
+                            });
+                            if (!localResult.success) {
+                                throw new Error(localResult.message);
                             }
+                            console.log("Session fermée localement dans SQLite :", localResult);
+                        } catch (err) {
+                            console.error("Erreur de fermeture locale SQLite :", err);
+                            Swal.fire('Erreur Locale !', 'Impossible de clôturer la caisse localement dans SQLite : ' + err.message, 'error');
+                            return;
+                        }
+                    }
+
+                    if (isCurrentlyOnline) {
+                        fetch('{{ route('employee.pos.session.close') }}', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                            },
+                            body: JSON.stringify({
+                                actual_closing_balance: actualBalance
+                            })
                         })
-                        .catch(error => {
-                            Swal.fire('Erreur!', 'Une erreur est survenue lors de la clôture.', 'error');
-                        });
+                            .then(response => response.json())
+                            .then(data => {
+                                if (data.success) {
+                                    const session = data.session;
+                                    const diff = parseFloat(session.difference);
+                                    let diffText = '';
+
+                                    if (diff === 0) {
+                                        diffText =
+                                            '<span style="color: green; font-weight: bold;">Caisse équilibrée (0 FCFA d\'écart)</span>';
+                                    } else if (diff > 0) {
+                                        diffText =
+                                            `<span style="color: blue; font-weight: bold;">Excédent de caisse de +${diff.toLocaleString()} FCFA</span>`;
+                                    } else {
+                                        diffText =
+                                            `<span style="color: red; font-weight: bold;">Déficit de caisse de ${diff.toLocaleString()} FCFA</span>`;
+                                    }
+
+                                    Swal.fire({
+                                        title: 'Caisse clôturée !',
+                                        html: `
+                                                <div style="text-align: left; font-size: 14px;">
+                                                    <p>Attendu : <b>${parseFloat(session.expected_closing_balance).toLocaleString()} FCFA</b></p>
+                                                    <p>Compté : <b>${parseFloat(session.actual_closing_balance).toLocaleString()} FCFA</b></p>
+                                                    <p style="margin-top:10px;">Résultat : ${diffText}</p>
+                                                </div>
+                                            `,
+                                        icon: 'success'
+                                    }).then(() => {
+                                        location.reload();
+                                    });
+                                } else {
+                                    Swal.fire('Erreur !', data.message, 'error');
+                                }
+                            })
+                            .catch(error => {
+                                console.error("Erreur serveur closeSession:", error);
+                                if (isElectron) {
+                                    Swal.fire('Clôture locale enregistrée', 'La clôture a été enregistrée localement dans SQLite. Elle sera synchronisée au retour de la connexion.', 'info').then(() => {
+                                        location.reload();
+                                    });
+                                } else {
+                                    Swal.fire('Erreur !', 'Une erreur est survenue lors de la clôture sur le serveur.', 'error');
+                                }
+                            });
+                    } else {
+                        // Hors-ligne
+                        if (isElectron) {
+                            Swal.fire({
+                                title: 'Caisse clôturée (Hors-ligne) !',
+                                text: 'La clôture a été enregistrée localement et sera synchronisée lors de la prochaine connexion.',
+                                icon: 'success'
+                            }).then(() => {
+                                location.reload();
+                            });
+                        } else {
+                            Swal.fire('Hors-ligne', 'Connexion internet requise pour clôturer la caisse.', 'error');
+                        }
+                    }
                 }
             });
         }
@@ -1996,7 +2191,7 @@
                         address
                     };
                 }
-            }).then((result) => {
+            }).then(async (result) => {
                 if (result.isConfirmed) {
                     Swal.fire({
                         title: 'Enregistrement en cours...',
@@ -2006,34 +2201,87 @@
                         }
                     });
 
-                    fetch('{{ route('employee.customers.store') }}', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-CSRF-TOKEN': '{{ csrf_token() }}'
-                        },
-                        body: JSON.stringify(result.value)
-                    })
-                        .then(response => response.json())
-                        .then(data => {
-                            if (data.success) {
-                                const c = data.customer;
-                                // Ajouter l'option au select et la sélectionner
-                                const select = document.getElementById('cart-customer-id');
-                                const option = document.createElement('option');
-                                option.value = c.id;
-                                option.text = `${c.name} ${c.phone ? '(' + c.phone + ')' : ''}`;
-                                select.add(option);
-                                select.value = c.id;
+                    // Détection de connexion
+                    let isCurrentlyOnline = navigator.onLine;
+                    if (typeof checkActualConnection === 'function') {
+                        isCurrentlyOnline = await checkActualConnection();
+                    }
 
-                                Swal.fire('Succès!', data.message, 'success');
+                    const isElectron = typeof window.electronAPI !== 'undefined';
+                    let localCustomer = null;
+
+                    if (isElectron) {
+                        try {
+                            const localResult = await window.electronAPI.invoke('sqlite-create-customer', result.value);
+                            if (localResult.success) {
+                                localCustomer = localResult.customer;
+                                console.log("Client créé localement dans SQLite :", localCustomer);
                             } else {
-                                Swal.fire('Erreur!', data.message, 'error');
+                                throw new Error(localResult.message);
                             }
+                        } catch (err) {
+                            console.error("Erreur création client SQLite :", err);
+                            Swal.fire('Erreur Locale !', 'Impossible de créer le client localement dans SQLite : ' + err.message, 'error');
+                            return;
+                        }
+                    }
+
+                    if (isCurrentlyOnline) {
+                        fetch('{{ route('employee.customers.store') }}', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                            },
+                            body: JSON.stringify(result.value)
                         })
-                        .catch(error => {
-                            Swal.fire('Erreur!', 'Impossible d\'enregistrer le client.', 'error');
-                        });
+                            .then(response => response.json())
+                            .then(data => {
+                                if (data.success) {
+                                    const c = data.customer;
+                                    // Ajouter l'option au select et la sélectionner
+                                    const select = document.getElementById('cart-customer-id');
+                                    const option = document.createElement('option');
+                                    option.value = c.id;
+                                    option.text = `${c.name} ${c.phone ? '(' + c.phone + ')' : ''}`;
+                                    select.add(option);
+                                    select.value = c.id;
+
+                                    Swal.fire('Succès !', data.message, 'success');
+                                } else {
+                                    Swal.fire('Erreur !', data.message, 'error');
+                                }
+                            })
+                            .catch(error => {
+                                console.error("Erreur serveur storeCustomer:", error);
+                                if (localCustomer) {
+                                    const select = document.getElementById('cart-customer-id');
+                                    const option = document.createElement('option');
+                                    option.value = localCustomer.id;
+                                    option.text = `${localCustomer.name} ${localCustomer.phone ? '(' + localCustomer.phone + ')' : ''}`;
+                                    select.add(option);
+                                    select.value = localCustomer.id;
+
+                                    Swal.fire('Créé localement', 'Client créé localement (hors-ligne). Il sera synchronisé.', 'success');
+                                } else {
+                                    Swal.fire('Erreur !', 'Impossible d\'enregistrer le client.', 'error');
+                                }
+                            });
+                    } else {
+                        // Hors-ligne
+                        if (localCustomer) {
+                            const select = document.getElementById('cart-customer-id');
+                            const option = document.createElement('option');
+                            option.value = localCustomer.id;
+                            option.text = `${localCustomer.name} ${localCustomer.phone ? '(' + localCustomer.phone + ')' : ''}`;
+                            select.add(option);
+                            select.value = localCustomer.id;
+
+                            Swal.fire('Créé localement', 'Client créé localement (hors-ligne). Il sera synchronisé.', 'success');
+                        } else {
+                            Swal.fire('Hors-ligne', 'Connexion internet requise pour enregistrer le client.', 'error');
+                        }
+                    }
                 }
             });
         }
@@ -2253,8 +2501,30 @@
         };
 
         // Appeler updateHeldCartsCount et masquer le loader
-        document.addEventListener('DOMContentLoaded', () => {
+        document.addEventListener('DOMContentLoaded', async () => {
             updateHeldCartsCount();
+
+            // Gestion dynamique de l'état de session sous Electron
+            const isElectron = typeof window.electronAPI !== 'undefined';
+            if (isElectron) {
+                try {
+                    const currentUserId = {{ auth()->id() ?? 'null' }};
+                    const localSession = await window.electronAPI.invoke('sqlite-get-active-session', currentUserId);
+                    
+                    const gate = document.getElementById('session-gate');
+                    const closeBtn = document.getElementById('close-session-btn');
+                    
+                    if (localSession) {
+                        if (gate) gate.style.display = 'none';
+                        if (closeBtn) closeBtn.style.display = 'flex';
+                    } else {
+                        if (gate) gate.style.display = 'flex';
+                        if (closeBtn) closeBtn.style.display = 'none';
+                    }
+                } catch (e) {
+                    console.error("Erreur check session active SQLite au chargement:", e);
+                }
+            }
         });
 
         function submitProfileUpdate(event) {

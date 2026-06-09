@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SuperMarché - Démarrage</title>
+    <style>
+        :root {
+            --bg-start: #002244;
+            --bg-end: #004d99;
+            --card-bg: rgba(255, 255, 255, 0.06);
+            --card-border: rgba(255, 255, 255, 0.1);
+            --primary: #38bdf8;
+            --primary-glow: rgba(56, 189, 248, 0.45);
+            --text-primary: #f8fafc;
+            --text-secondary: #93c5fd;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: linear-gradient(135deg, var(--bg-start) 0%, var(--bg-end) 100%);
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            padding: 24px;
+        }
+
+        /* --- GRADIENT AMBIANT --- */
+        .ambient-glow {
+            position: absolute;
+            top: 40%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 500px;
+            height: 500px;
+            background: radial-gradient(circle, rgba(56, 189, 248, 0.1) 0%, rgba(56, 189, 248, 0.03) 50%, rgba(0, 0, 0, 0) 70%);
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        /* --- GLASS CONTAINER --- */
+        .container {
+            width: 100%;
+            max-width: 450px;
+            background: var(--card-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--card-border);
+            border-radius: 28px;
+            padding: 45px 40px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6),
+                        inset 0 1px 0 rgba(255, 255, 255, 0.05);
+            text-align: center;
+            position: relative;
+            z-index: 10;
+            animation: fadeIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        /* --- LOGO ANIMÉ --- */
+        .logo-wrap {
+            position: relative;
+            width: 100px;
+            height: 100px;
+            margin: 0 auto 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            animation: bounceLogo 2.5s infinite ease-in-out;
+        }
+
+        .icon-container {
+            position: relative;
+            width: 86px;
+            height: 86px;
+            background: #ffffff;
+            border-radius: 26px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            box-shadow: 0 0 30px var(--primary-glow);
+            z-index: 2;
+            overflow: hidden;
+            padding: 8px;
+        }
+
+        .icon-container img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            border-radius: 18px;
+        }
+
+        /* Cercle orbitant bleu pulsant autour de l'icône de caisse */
+        .orbit-ring {
+            position: absolute;
+            top: -4px;
+            left: -4px;
+            right: -4px;
+            bottom: -4px;
+            border-radius: 30px;
+            border: 2px solid transparent;
+            border-top: 2px solid var(--primary);
+            border-left: 2px solid var(--primary);
+            animation: rotateOrbit 2s linear infinite;
+            filter: drop-shadow(0 0 5px var(--primary-glow));
+            z-index: 1;
+        }
+
+        /* --- TYPOGRAPHIE --- */
+        h1 {
+            font-size: 24px;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            margin-bottom: 12px;
+            background: linear-gradient(to right, #ffffff, #c7d2fe);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .status-text {
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin-bottom: 35px;
+            line-height: 1.6;
+            font-weight: 500;
+        }
+
+        /* --- GLOWING SPINNER --- */
+        .spinner-container {
+            position: relative;
+            width: 40px;
+            height: 40px;
+            margin: 0 auto;
+        }
+
+        .spinner {
+            width: 100%;
+            height: 100%;
+            border: 3px solid rgba(255, 255, 255, 0.05);
+            border-top: 3px solid var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        .spinner-glow {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            box-shadow: 0 0 15px var(--primary);
+            opacity: 0.3;
+            animation: pulse-glow 1.5s infinite ease-in-out;
+        }
+
+        /* --- ANIMATIONS --- */
+        @keyframes rotateOrbit {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @keyframes bounceLogo {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-6px); }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(15px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @keyframes pulse-glow {
+            0%, 100% { transform: scale(1); opacity: 0.2; }
+            50% { transform: scale(1.05); opacity: 0.4; }
+        }
+    </style>
+</head>
+<body>
+    <div class="ambient-glow"></div>
+
+    <div class="container">
+        <!-- Logo avec orbite bleu/indigo animée -->
+        <div class="logo-wrap">
+            <div class="icon-container">
+                <img src="logo/icon.png" alt="SuperGéo">
+            </div>
+            <div class="orbit-ring"></div>
+        </div>
+
+        <h1 id="store-title">SuperGéo</h1>
+        <p class="status-text" id="status">Démarrage de l'application...</p>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            if (window.electronAPI && typeof window.electronAPI.invoke === 'function') {
+                try {
+                    const settings = await window.electronAPI.invoke('sqlite-get-settings');
+                    if (settings && settings.store_name) {
+                        document.getElementById('store-title').textContent = settings.store_name;
+                    }
+                } catch (e) {
+                    console.error("Impossible de charger le nom de la boutique :", e);
+                }
+            }
+        });
+    </script>
+</body>
+</html>

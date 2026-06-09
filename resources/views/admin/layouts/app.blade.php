@@ -716,6 +716,52 @@
                 });
             }
         });
+
+        // ════════════════════════════════════════════════════════════════════════
+        //  SYNC MANAGER — SQLite ↔ MySQL (Admin Pull)
+        // ════════════════════════════════════════════════════════════════════════
+        const isElectron = typeof window.electronAPI !== 'undefined';
+        const BASE_URL    = window.location.origin;
+
+        async function checkActualConnection() {
+            if (!navigator.onLine) return false;
+            try {
+                const controller = new AbortController();
+                const timeoutId  = setTimeout(() => controller.abort(), 1500);
+                await fetch('https://1.1.1.1', { method: 'GET', mode: 'no-cors', cache: 'no-store', signal: controller.signal });
+                clearTimeout(timeoutId);
+                return true;
+            } catch (e) {
+                return false;
+            }
+        }
+
+        async function pullFromServer() {
+            if (!isElectron) return;
+            try {
+                console.log('📥 Pull depuis le serveur...');
+                const result = await window.electronAPI.invoke('sqlite-pull', {
+                    baseUrl: BASE_URL,
+                    sessionCookie: document.cookie
+                });
+                if (result.success) {
+                    console.log('✅ Pull réussi :', result.stats);
+                } else {
+                    console.warn('⚠️ Pull échoué :', result.message);
+                }
+            } catch (e) {
+                console.error('Erreur pull:', e);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            const isOnline = await checkActualConnection();
+            const isLocalServer = BASE_URL.includes('127.0.0.1') || BASE_URL.includes('localhost');
+            if (isElectron && (isOnline || isLocalServer)) {
+                console.log('🚀 Pull initial des données au démarrage de la session admin...');
+                await pullFromServer();
+            }
+        });
     </script>
 
     @stack('scripts')

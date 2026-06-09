@@ -9,9 +9,9 @@
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap"
         rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-    <script src="https://unpkg.com/html5-qrcode"></script>
+    <script src="{{ asset('js/sweetalert2.all.min.js') }}"></script>
+    <script src="{{ asset('js/qrcode.min.js') }}"></script>
+    <script src="{{ asset('js/html5-qrcode.min.js') }}"></script>
     <style>
         :root {
             --primary: #004d99;
@@ -719,338 +719,303 @@
     @stack('print')
     @stack('scripts')
 
-    <!-- Scripts pour SQLite (Electron) / IndexedDB (Navigateur) et Synchronisation Offline -->
     <script>
-        // Initialisation de la base de données locale (SQLite sous Electron, IndexedDB sous navigateur standard)
-        let isElectron = typeof window.electronAPI !== 'undefined';
-        let db;
+        // ════════════════════════════════════════════════════════════════════════
+        //  SYNC MANAGER — SQLite ↔ MySQL
+        //  Détecte si on est sous Electron, gère le mode offline complet
+        //  et synchronise au retour de connexion.
+        // ════════════════════════════════════════════════════════════════════════
 
-        if (!isElectron) {
-            // Uniquement si on n'est pas sous Electron (fallback navigateur standard)
-            try {
-                const request = indexedDB.open("supermarche_pos_db", 1);
+        const isElectron = typeof window.electronAPI !== 'undefined';
+        const BASE_URL    = window.location.origin; // http://127.0.0.1:8000 ou https://fescads.com
 
-                request.onupgradeneeded = function (event) {
-                    const dbInstance = event.target.result;
-                    if (!dbInstance.objectStoreNames.contains("offline_sales")) {
-                        dbInstance.createObjectStore("offline_sales", {
-                            keyPath: "localId",
-                            autoIncrement: true
-                        });
-                    }
-                };
+        // ── Détection de connexion ─────────────────────────────────────────────
 
-                request.onsuccess = function (event) {
-                    db = event.target.result;
-                    updateOfflineCountUI().catch(err => console.error(err));
-                    checkAndSyncOfflineSales().catch(err => console.error(err));
-                };
-
-                request.onerror = function (event) {
-                    console.error("Erreur d'initialisation IndexedDB :", event.target.errorCode);
-                };
-            } catch (e) {
-                console.error("Impossible d'initialiser IndexedDB dans ce navigateur :", e);
-            }
-        } else {
-            // Sous Electron, on attend la fin du chargement du DOM pour initialiser l'UI et lancer la synchro
-            document.addEventListener('DOMContentLoaded', () => {
-                updateOfflineCountUI().catch(err => console.error(err));
-                checkAndSyncOfflineSales().catch(err => console.error(err));
-            });
-        }
-
-        // Enregistrer une vente en local (fallback hors-ligne)
-        async function saveOfflineSale(saleData) {
-            if (isElectron) {
-                try {
-                    const result = await window.electronAPI.saveOfflineSale(saleData);
-                    await updateOfflineCountUI();
-                    return result.localId;
-                } catch (err) {
-                    console.error("Erreur d'écriture SQLite via Electron :", err);
-                    throw err;
-                }
-            }
-
-            return new Promise((resolve, reject) => {
-                try {
-                    if (!db) {
-                        reject("La base IndexedDB n'est pas disponible.");
-                        return;
-                    }
-                    const transaction = db.transaction(["offline_sales"], "readwrite");
-                    const store = transaction.objectStore("offline_sales");
-                    const req = store.add(saleData);
-
-                    req.onsuccess = function (e) {
-                        updateOfflineCountUI().catch(err => console.error(err));
-                        resolve(e.target.result);
-                    };
-
-                    req.onerror = function (e) {
-                        reject(e.target.error);
-                    };
-                } catch (ex) {
-                    reject(e);
-                }
-            });
-        }
-
-        // Récupérer toutes les ventes en local
-        async function getOfflineSales() {
-            if (isElectron) {
-                try {
-                    return await window.electronAPI.getOfflineSales() || [];
-                } catch (err) {
-                    console.error("Erreur de lecture SQLite via Electron :", err);
-                    return [];
-                }
-            }
-
-            return new Promise((resolve, reject) => {
-                try {
-                    if (!db) return resolve([]);
-                    const transaction = db.transaction(["offline_sales"], "readonly");
-                    const store = transaction.objectStore("offline_sales");
-                    const req = store.getAll();
-
-                    req.onsuccess = function (e) {
-                        resolve(e.target.result || []);
-                    };
-
-                    req.onerror = function (e) {
-                        reject(e.target.error);
-                    };
-                } catch (ex) {
-                    resolve([]);
-                }
-            });
-        }
-
-        // Supprimer des ventes locales par ID après synchronisation réussie
-        async function deleteOfflineSales(localIds) {
-            if (isElectron) {
-                try {
-                    await window.electronAPI.deleteOfflineSales(localIds);
-                    await updateOfflineCountUI();
-                    return;
-                } catch (err) {
-                    console.error("Erreur de suppression SQLite via Electron :", err);
-                    throw err;
-                }
-            }
-
-            return new Promise((resolve, reject) => {
-                try {
-                    if (!db || localIds.length === 0) return resolve();
-                    const transaction = db.transaction(["offline_sales"], "readwrite");
-                    const store = transaction.objectStore("offline_sales");
-
-                    localIds.forEach(id => {
-                        store.delete(id);
-                    });
-
-                    transaction.oncomplete = function () {
-                        updateOfflineCountUI().catch(err => console.error(err));
-                        resolve();
-                    };
-
-                    transaction.onerror = function (e) {
-                        reject(e.target.error);
-                    };
-                } catch (ex) {
-                    reject(ex);
-                }
-            });
-        }
-
-        // Mettre à jour l'indicateur visuel du nombre de ventes en attente de synchro
-        async function updateOfflineCountUI() {
-            try {
-                const sales = await getOfflineSales();
-                const count = Array.isArray(sales) ? sales.length : 0;
-                const syncBtn = document.getElementById('btn-manual-sync');
-                const countContainer = document.getElementById('sync-pending-count');
-
-                if (countContainer) countContainer.textContent = count;
-
-                if (syncBtn) {
-                    if (count > 0) {
-                        syncBtn.style.display = 'flex';
-                    } else {
-                        syncBtn.style.display = 'none';
-                    }
-                }
-            } catch (e) {
-                console.error("Erreur de mise à jour UI offline :", e);
-            }
-        }
-
-        // Synchroniser automatiquement en arrière-plan ou manuel
-        let isSyncing = false;
-        async function checkAndSyncOfflineSales(isManual = false) {
-            if (isSyncing) return;
-            if (!navigator.onLine) {
-                if (isManual) {
-                    Swal.fire("Hors-ligne", "Impossible de synchroniser sans connexion internet.", "warning");
-                }
-                return;
-            }
-
-            try {
-                const sales = await getOfflineSales();
-                if (sales.length === 0) {
-                    if (isManual) {
-                        Swal.fire("Synchronisation", "Aucune donnée hors-ligne à synchroniser.", "info");
-                    }
-                    return;
-                }
-
-                isSyncing = true;
-                const syncIcon = document.getElementById('sync-icon');
-                if (syncIcon) syncIcon.classList.add('fa-spin');
-
-                const response = await fetch('{{ route('employee.pos.sync') }}', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
-                    },
-                    body: JSON.stringify({
-                        sales: sales
-                    })
-                });
-
-                if (!response.ok) {
-                    throw new Error("Erreur de synchronisation HTTP");
-                }
-
-                const result = await response.json();
-                if (result.success && result.syncedLocalIds && result.syncedLocalIds.length > 0) {
-                    await deleteOfflineSales(result.syncedLocalIds);
-                    if (isManual) {
-                        Swal.fire({
-                            title: "Succès !",
-                            text: `${result.syncedLocalIds.length} vente(s) ont été synchronisées avec la base de données.`,
-                            icon: "success",
-                            timer: 2000,
-                            showConfirmButton: false
-                        });
-                    }
-                }
-
-                if (result.errors && result.errors.length > 0) {
-                    console.error("Erreurs pdt la synchro :", result.errors);
-                }
-            } catch (err) {
-                console.error("Erreur lors de la synchronisation automatique :", err);
-                if (isManual) {
-                    Swal.fire("Erreur", "La synchronisation a échoué. Réessayez plus tard.", "error");
-                }
-            } finally {
-                isSyncing = false;
-                const syncIcon = document.getElementById('sync-icon');
-                if (syncIcon) syncIcon.classList.remove('fa-spin');
-                updateOfflineCountUI();
-            }
-        }
-
-        // Fonction déclenchée par le bouton de synchronisation manuelle
-        function triggerManualSync() {
-            checkAndSyncOfflineSales(true);
-        }
-
-        // Détection réelle de la connexion : d'abord via navigator.onLine (très rapide), puis via un ping externe uniquement si nécessaire
         async function checkActualConnection() {
-            // Si le navigateur lui-même dit qu'on est offline, on s'arrête là
-            if (!navigator.onLine) {
-                return false;
-            }
-
+            if (!navigator.onLine) return false;
             try {
-                // Pour savoir si la CAISSE a vraiment accès à Internet, on ping un serveur public distant (par ex: Cloudflare)
-                // au lieu de pinguer le serveur local localhost/127.0.0.1 qui répondra TOUJOURS même en mode avion.
                 const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 1500);
-
-                // On utilise mode: 'no-cors' pour bypasser les restrictions mais obtenir l'état de la connexion TCP/IP
-                await fetch('https://1.1.1.1', {
-                    method: 'GET',
-                    mode: 'no-cors',
-                    cache: 'no-store',
-                    signal: controller.signal
-                });
-
+                const timeoutId  = setTimeout(() => controller.abort(), 1500);
+                await fetch('https://1.1.1.1', { method: 'GET', mode: 'no-cors', cache: 'no-store', signal: controller.signal });
                 clearTimeout(timeoutId);
                 return true;
             } catch (e) {
-                // Si l'appel externe échoue (erreur de DNS ou connexion coupée), on est réellement déconnecté d'Internet !
                 return false;
             }
         }
+
+        let _isOnline = true; // État courant (mis à jour par updateConnectionPill)
 
         async function updateConnectionPill() {
             const pill = document.getElementById('connection-status-pill');
             const icon = document.getElementById('connection-status-icon');
             const text = document.getElementById('connection-status-text');
 
-            const isReallyOnline = await checkActualConnection();
+            const wasOnline = _isOnline;
+            _isOnline = await checkActualConnection();
 
-            if (isReallyOnline) {
-                if (pill) {
-                    pill.style.background = '#059669';
-                    pill.style.borderColor = 'rgba(255,255,255,0.2)';
-                }
-                if (icon) {
-                    icon.className = 'fa-solid fa-wifi';
-                }
+            if (_isOnline) {
+                if (pill) { pill.style.background = '#059669'; pill.style.borderColor = 'rgba(255,255,255,0.2)'; }
+                if (icon) icon.className = 'fa-solid fa-wifi';
                 if (text) text.textContent = 'EN LIGNE';
-
-                // Lancer une synchronisation dès le retour en ligne
-                setTimeout(() => {
-                    checkAndSyncOfflineSales().catch(err => console.error(err));
-                }, 2000);
+                // Lancer une sync au retour en ligne
+                if (!wasOnline) {
+                    console.log('🌐 Connexion rétablie → synchronisation automatique...');
+                    setTimeout(() => triggerManualSync(false), 2000);
+                }
             } else {
-                if (pill) {
-                    pill.style.background = '#dc2626';
-                    pill.style.borderColor = 'rgba(255,255,255,0.3)';
-                }
-                if (icon) {
-                    icon.className = 'fa-solid fa-wifi-slash';
-                }
+                if (pill) { pill.style.background = '#dc2626'; pill.style.borderColor = 'rgba(255,255,255,0.3)'; }
+                if (icon) icon.className = 'fa-solid fa-wifi-slash';
                 if (text) text.textContent = 'HORS-LIGNE';
+            }
+
+            // Afficher/cacher le bouton sync selon le nb d'opérations en attente
+            await updatePendingCount();
+        }
+
+        // ── Compteur d'opérations en attente ──────────────────────────────────
+
+        async function updatePendingCount() {
+            try {
+                let count = 0;
+                if (isElectron) {
+                    count = await window.electronAPI.invoke('sqlite-pending-count') || 0;
+                } else {
+                    // Fallback IndexedDB
+                    const sales = await getOfflineSales();
+                    count = Array.isArray(sales) ? sales.length : 0;
+                }
+                const countEl  = document.getElementById('sync-pending-count');
+                const syncBtn  = document.getElementById('btn-manual-sync');
+                if (countEl) countEl.textContent = count;
+                if (syncBtn) syncBtn.style.display = (count > 0 && _isOnline) ? 'flex' : 'none';
+            } catch (e) {
+                console.error('updatePendingCount error:', e);
             }
         }
 
-        window.addEventListener('online', () => {
-            updateConnectionPill();
-        });
-        window.addEventListener('offline', () => {
-            updateConnectionPill();
-        });
+        // Alias pour compatibilité avec l'ancien code
+        async function updateOfflineCountUI() { await updatePendingCount(); }
 
-        // Un intervalle régulier pour faire un ping et actualiser le statut réel
-        setInterval(() => {
-            updateConnectionPill();
-        }, 5000);
+        // ── Pull : télécharger MySQL → SQLite ─────────────────────────────────
 
-        // Initialisation de la pill de connexion
-        setTimeout(() => {
-            updateConnectionPill();
-            const viewCaisse = document.getElementById('view-caisse');
-            if (viewCaisse && viewCaisse.style.display !== 'none') {
-                const offInd = document.getElementById('nav-offline-indicator');
-                if (offInd) offInd.style.display = 'flex';
+        async function pullFromServer() {
+            if (!isElectron) return;
+            try {
+                console.log('📥 Pull depuis le serveur...');
+                const result = await window.electronAPI.invoke('sqlite-pull', {
+                    baseUrl: BASE_URL,
+                    sessionCookie: document.cookie
+                });
+                if (result.success) {
+                    console.log('✅ Pull réussi :', result.stats);
+                } else {
+                    console.warn('⚠️ Pull échoué :', result.message);
+                }
+                return result;
+            } catch (e) {
+                console.error('Erreur pull:', e);
             }
-        }, 1000);
+        }
 
-        // Synchronisation automatique toutes les 60 secondes si internet revient
-        setInterval(() => {
-            if (navigator.onLine) {
-                checkAndSyncOfflineSales();
+        // ── Push : SQLite → MySQL ─────────────────────────────────────────────
+
+        let isSyncing = false;
+
+        async function checkAndSyncOfflineSales(isManual = false) {
+            if (isSyncing) return;
+            if (!_isOnline) {
+                if (isManual) Swal.fire('Hors-ligne', 'Impossible de synchroniser sans connexion internet.', 'warning');
+                return;
             }
-        }, 60000);
+
+            isSyncing = true;
+            const syncIcon = document.getElementById('sync-icon');
+            if (syncIcon) syncIcon.classList.add('fa-spin');
+
+            try {
+                let result;
+
+                if (isElectron) {
+                    // ── Nouveau chemin via IPC sqlite-push ────────────────────
+                    result = await window.electronAPI.invoke('sqlite-push', {
+                        baseUrl: BASE_URL,
+                        sessionCookie: document.cookie
+                    });
+
+                    if (result.success) {
+                        if (result.synced > 0 && isManual) {
+                            Swal.fire({
+                                title: 'Synchronisation réussie !',
+                                text: `${result.synced} opération(s) ont été envoyées au serveur.`,
+                                icon: 'success', timer: 2500, showConfirmButton: false
+                            });
+                        } else if (result.synced === 0 && isManual) {
+                            Swal.fire('Synchronisation', 'Aucune donnée hors-ligne à synchroniser.', 'info');
+                        }
+                    } else {
+                        throw new Error(result.message || 'Erreur inconnue');
+                    }
+                } else {
+                    // ── Ancien chemin via IndexedDB → route Laravel pos.sync ──
+                    const sales = await getOfflineSales();
+                    if (sales.length === 0) {
+                        if (isManual) Swal.fire('Synchronisation', 'Aucune donnée hors-ligne à synchroniser.', 'info');
+                        return;
+                    }
+
+                    const response = await fetch('{{ route('employee.pos.sync') }}', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                        body: JSON.stringify({ sales })
+                    });
+
+                    if (!response.ok) throw new Error('Erreur HTTP ' + response.status);
+                    result = await response.json();
+
+                    if (result.success && result.syncedLocalIds?.length > 0) {
+                        await deleteOfflineSales(result.syncedLocalIds);
+                        if (isManual) {
+                            Swal.fire({
+                                title: 'Succès !',
+                                text: `${result.syncedLocalIds.length} vente(s) synchronisées.`,
+                                icon: 'success', timer: 2000, showConfirmButton: false
+                            });
+                        }
+                    }
+                }
+
+                if (result?.errors?.length > 0) console.error('Erreurs sync:', result.errors);
+
+            } catch (err) {
+                console.error('Erreur synchronisation:', err);
+                if (isManual) Swal.fire('Erreur', 'La synchronisation a échoué. Réessayez plus tard.', 'error');
+            } finally {
+                isSyncing = false;
+                if (syncIcon) syncIcon.classList.remove('fa-spin');
+                await updatePendingCount();
+            }
+        }
+
+        function triggerManualSync(showFeedback = true) {
+            checkAndSyncOfflineSales(showFeedback);
+        }
+
+        // ── Fallback IndexedDB (navigateur standard sans Electron) ────────────
+
+        let _idb;
+        if (!isElectron) {
+            try {
+                const req = indexedDB.open('supermarche_pos_db', 1);
+                req.onupgradeneeded = (e) => {
+                    const d = e.target.result;
+                    if (!d.objectStoreNames.contains('offline_sales')) {
+                        d.createObjectStore('offline_sales', { keyPath: 'localId', autoIncrement: true });
+                    }
+                };
+                req.onsuccess = (e) => {
+                    _idb = e.target.result;
+                    updateOfflineCountUI();
+                    checkAndSyncOfflineSales();
+                };
+            } catch (e) { console.error('IndexedDB init failed:', e); }
+        }
+
+        async function saveOfflineSale(saleData) {
+            if (isElectron) {
+                const result = await window.electronAPI.invoke('sqlite-create-sale', saleData);
+                await updatePendingCount();
+                return result;
+            }
+            return new Promise((resolve, reject) => {
+                if (!_idb) return reject('IndexedDB non disponible');
+                const tx  = _idb.transaction(['offline_sales'], 'readwrite');
+                const req = tx.objectStore('offline_sales').add(saleData);
+                req.onsuccess = (e) => { updateOfflineCountUI(); resolve({ success: true, localId: e.target.result }); };
+                req.onerror   = (e) => reject(e.target.error);
+            });
+        }
+
+        async function getOfflineSales() {
+            if (isElectron) return await window.electronAPI.invoke('get-offline-sales') || [];
+            return new Promise((resolve) => {
+                if (!_idb) return resolve([]);
+                const req = _idb.transaction(['offline_sales'], 'readonly').objectStore('offline_sales').getAll();
+                req.onsuccess = (e) => resolve(e.target.result || []);
+                req.onerror   = () => resolve([]);
+            });
+        }
+
+        async function deleteOfflineSales(localIds) {
+            if (isElectron) { await window.electronAPI.invoke('delete-offline-sales', localIds); await updatePendingCount(); return; }
+            return new Promise((resolve) => {
+                if (!_idb || !localIds.length) return resolve();
+                const tx = _idb.transaction(['offline_sales'], 'readwrite');
+                const st = tx.objectStore('offline_sales');
+                localIds.forEach(id => st.delete(id));
+                tx.oncomplete = () => { updateOfflineCountUI(); resolve(); };
+            });
+        }
+
+        // ── Checkout unifié (en-ligne OU hors-ligne) ──────────────────────────
+        // Cette fonction est appelée depuis le dashboard POS à la place du fetch direct.
+        // Elle détecte la connexion et choisit le bon chemin.
+
+        window.unifiedCheckout = async function(salePayload, activeSessionId, userId) {
+            if (_isOnline) {
+                // ── Mode EN LIGNE : appel Laravel normal ──
+                const response = await fetch('{{ route('employee.pos.checkout') }}', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                    body: JSON.stringify(salePayload)
+                });
+                if (!response.ok) {
+                    const err = await response.json().catch(() => ({ message: 'Erreur réseau' }));
+                    throw new Error(err.message || 'Erreur HTTP ' + response.status);
+                }
+                return await response.json();
+            } else {
+                // ── Mode HORS-LIGNE : IPC SQLite ──
+                if (!isElectron) throw new Error('Mode hors-ligne uniquement disponible dans l\'application desktop.');
+
+                const result = await window.electronAPI.invoke('sqlite-create-sale', {
+                    userId:         userId,
+                    cashSessionId:  activeSessionId,
+                    customerId:     salePayload.customer_id || null,
+                    totalAmount:    salePayload.total_amount,
+                    amountReceived: salePayload.amount_received,
+                    changeAmount:   salePayload.change_amount,
+                    paymentMethod:  salePayload.payment_method || 'cash',
+                    items:          (salePayload.items || []).map(i => ({ id: i.id, qty: i.qty, price: i.price })),
+                    createdAt:      new Date().toISOString()
+                });
+
+                await updatePendingCount();
+                return result;
+            }
+        };
+
+        // ── Initialisation ────────────────────────────────────────────────────
+
+        window.addEventListener('online',  () => updateConnectionPill());
+        window.addEventListener('offline', () => updateConnectionPill());
+        setInterval(() => updateConnectionPill(), 10000);  // Ping toutes les 10s
+        setInterval(() => { if (_isOnline) checkAndSyncOfflineSales(); }, 60000); // Auto-sync toutes les 60s
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            await updateConnectionPill();
+
+            // Afficher l'indicateur de connexion dans la navbar
+            const offInd = document.getElementById('nav-offline-indicator');
+            if (offInd) offInd.style.display = 'flex';
+
+            // Pull initial si on est en ligne ou sur le serveur local de dev (recharger les données fraîches)
+            const isLocalServer = BASE_URL.includes('127.0.0.1') || BASE_URL.includes('localhost');
+            if (isElectron && (_isOnline || isLocalServer)) {
+                console.log('🚀 Pull initial des données au démarrage...');
+                await pullFromServer();
+            }
+        });
     </script>
 
 </body>
