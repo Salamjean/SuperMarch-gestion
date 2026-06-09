@@ -28,6 +28,13 @@
         "directories": {
             "output": "dist-production"
         },
+        "files": [
+            "**/*",
+            "!.git-rewrite",
+            "!.git-rewrite/**",
+            "!dist-production",
+            "!dist-production/**"
+        ],
         "win": {
             "target": "nsis",
             "icon": "public/logo/icon_square.png"
