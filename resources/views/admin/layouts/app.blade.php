@@ -121,12 +121,15 @@
             flex: 1;
             padding: 0 12px 25px;
             overflow-y: auto;
-            scrollbar-width: none;        /* Firefox */
-            -ms-overflow-style: none;     /* IE/Edge */
+            scrollbar-width: none;
+            /* Firefox */
+            -ms-overflow-style: none;
+            /* IE/Edge */
         }
 
         .sidebar-nav::-webkit-scrollbar {
-            display: none;                /* Chrome, Safari */
+            display: none;
+            /* Chrome, Safari */
         }
 
         .sidebar-section-label {
@@ -393,12 +396,15 @@
             .navbar {
                 padding: 0 12px;
             }
+
             .navbar-badge {
                 display: none !important;
             }
+
             .navbar-username {
                 font-size: 0 !important;
             }
+
             .navbar-username i {
                 font-size: 20px !important;
                 margin-right: 0 !important;
@@ -609,6 +615,7 @@
                 opacity: 0;
                 transform: translateY(-6px);
             }
+
             to {
                 opacity: 1;
                 transform: translateY(0);
@@ -698,19 +705,19 @@
             btn.closest('.sidebar-dropdown').classList.toggle('open');
         }
 
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function () {
             const sidebar = document.getElementById('sidebar');
             const sidebarToggle = document.getElementById('sidebarToggle');
             const sidebarOverlay = document.getElementById('sidebarOverlay');
 
             if (sidebarToggle && sidebar && sidebarOverlay) {
-                sidebarToggle.addEventListener('click', function(e) {
+                sidebarToggle.addEventListener('click', function (e) {
                     e.stopPropagation();
                     sidebar.classList.toggle('open');
                     sidebarOverlay.classList.toggle('open');
                 });
 
-                sidebarOverlay.addEventListener('click', function() {
+                sidebarOverlay.addEventListener('click', function () {
                     sidebar.classList.remove('open');
                     sidebarOverlay.classList.remove('open');
                 });
@@ -721,13 +728,13 @@
         //  SYNC MANAGER — SQLite ↔ MySQL (Admin Pull)
         // ════════════════════════════════════════════════════════════════════════
         const isElectron = typeof window.electronAPI !== 'undefined';
-        const BASE_URL    = window.location.origin;
+        const BASE_URL = window.location.origin;
 
         async function checkActualConnection() {
             if (!navigator.onLine) return false;
             try {
                 const controller = new AbortController();
-                const timeoutId  = setTimeout(() => controller.abort(), 1500);
+                const timeoutId = setTimeout(() => controller.abort(), 1500);
                 await fetch('https://1.1.1.1', { method: 'GET', mode: 'no-cors', cache: 'no-store', signal: controller.signal });
                 clearTimeout(timeoutId);
                 return true;

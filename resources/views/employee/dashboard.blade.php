@@ -775,58 +775,102 @@
                 isCurrentlyOnline = await checkActualConnection();
             }
 
-            if (!isCurrentlyOnline) {
-                // FALLBACK MODE OFFLINE : Enregistrement local
-                const offlineReference = 'SAL-OFF-' + Math.random().toString(36).substr(2, 9).toUpperCase();
+            const isElectron = typeof window.electronAPI !== 'undefined';
+            let currentUserId = {{ auth()->id() ?? 'null' }};
+            let currentSessionId = {{ $activeSession->id ?? 'null' }};
 
-                // Mettre à jour fictivement les stocks locaux dans l'interface en attendant la synchro
-                cart.forEach(item => {
-                    const card = document.getElementById(`prod-card-${item.id}`);
-                    if (card) {
-                        const stockBadge = card.querySelector('.product-stock');
-                        if (stockBadge) {
-                            let currStock = parseInt(stockBadge.textContent.replace('Stock: ', '')) || 0;
-                            let nextStock = Math.max(0, currStock - item.qty);
-                            stockBadge.textContent = `Stock: ${nextStock}`;
-                        }
+            if (isElectron) {
+                try {
+                    const localSession = await window.electronAPI.invoke('sqlite-get-active-session', currentUserId);
+                    if (localSession) {
+                        currentSessionId = localSession.id;
                     }
-                });
+                } catch (e) {
+                    console.error("Erreur de récupération de session active SQLite:", e);
+                }
+            }
 
-                const isElectron = typeof window.electronAPI !== 'undefined';
-                let currentUserId = {{ auth()->id() ?? 'null' }};
-                let currentSessionId = {{ $activeSession->id ?? 'null' }};
+            const offlineReference = 'SAL-OFF-' + Math.random().toString(36).substr(2, 9).toUpperCase();
+            
+            const saleData = {
+                userId: currentUserId,
+                cashSessionId: currentSessionId,
+                items: cart,
+                total_amount: total,
+                amount_received: received,
+                change_amount: change,
+                customer_id: customerIdVal,
+                payment_method: paymentMethodSelected,
+                reference: offlineReference,
+                created_at: new Date().toISOString()
+            };
 
-                if (isElectron) {
-                    try {
-                        const localSession = await window.electronAPI.invoke('sqlite-get-active-session', currentUserId);
-                        if (localSession) {
-                            currentSessionId = localSession.id;
-                        }
-                    } catch (e) {
-                        console.error("Erreur de récupération de session active SQLite:", e);
+            // Mettre à jour fictivement les stocks locaux dans l'interface en attendant la synchro
+            cart.forEach(item => {
+                const card = document.getElementById(`prod-card-${item.id}`);
+                if (card) {
+                    const stockBadge = card.querySelector('.product-stock');
+                    if (stockBadge) {
+                        let currStock = parseInt(stockBadge.textContent.replace('Stock: ', '')) || 0;
+                        let nextStock = Math.max(0, currStock - item.qty);
+                        stockBadge.textContent = `Stock: ${nextStock}`;
                     }
                 }
+            });
 
-                const offlineSale = {
-                    userId: currentUserId,
-                    cashSessionId: currentSessionId,
-                    items: cart,
-                    total_amount: total,
-                    amount_received: received,
-                    change_amount: change,
-                    customer_id: customerIdVal,
-                    payment_method: paymentMethodSelected,
-                    reference: offlineReference,
-                    created_at: new Date().toISOString()
-                };
-
+            if (isElectron) {
+                // ── Mode Electron : Enregistrement local SQLite systématique ──
                 try {
-                    await saveOfflineSale(offlineSale);
-                    printLocalReceipt(offlineSale);
+                    const localResult = await saveOfflineSale(saleData);
+                    if (!localResult.success) {
+                        throw new Error(localResult.message);
+                    }
+
+                    // Imprimer le reçu localement
+                    const printedSale = localResult.sale || saleData;
+                    printLocalReceipt(printedSale);
+
+                    if (isCurrentlyOnline) {
+                        // Tenter de pousser la vente en ligne immédiatement
+                        try {
+                            const pushResult = await window.electronAPI.invoke('sqlite-push', {
+                                baseUrl: window.location.origin,
+                                sessionCookie: document.cookie
+                            });
+                            if (pushResult.success && pushResult.synced > 0) {
+                                console.log("Vente synchronisée en ligne immédiatement.");
+                            }
+                        } catch (pushErr) {
+                            console.warn("Échec du push immédiat en tâche de fond (elle sera retentée) :", pushErr);
+                        }
+                    }
 
                     Swal.fire({
+                        title: isCurrentlyOnline ? 'Vente enregistrée !' : 'Vente sauvegardée (Hors-ligne)',
+                        text: isCurrentlyOnline ? 'La vente a été enregistrée localement et synchronisée en ligne.' : 'La vente a été enregistrée localement et sera synchronisée dès le retour d\'une connexion internet.',
+                        icon: 'success'
+                    }).then(() => {
+                        cart = [];
+                        saveCart();
+                        updateCartUI();
+                        location.reload();
+                    });
+
+                } catch (err) {
+                    console.error("Erreur de sauvegarde locale SQLite :", err);
+                    Swal.fire("Erreur", "Impossible d'enregistrer la vente localement : " + err.message, "error");
+                }
+                return;
+            }
+
+            // ── Mode standard (hors Electron - par exemple navigateur Web direct) ──
+            if (!isCurrentlyOnline) {
+                try {
+                    await saveOfflineSale(saleData);
+                    printLocalReceipt(saleData);
+                    Swal.fire({
                         title: 'Vente sauvegardée (Hors-ligne)',
-                        text: 'La vente a été enregistrée localement et sera synchronisée dès le retour d\'une connexion internet.',
+                        text: 'La vente a été enregistrée localement.',
                         icon: 'success'
                     }).then(() => {
                         cart = [];
@@ -834,12 +878,12 @@
                         updateCartUI();
                     });
                 } catch (err) {
-                    console.error("Erreur de sauvegarde locale :", err);
-                    Swal.fire("Erreur", "Impossible d'enregistrer la vente localement.", "error");
+                    Swal.fire("Erreur", "Impossible d'enregistrer la vente hors-ligne.", "error");
                 }
                 return;
             }
 
+            // En ligne normal sur navigateur
             fetch('{{ route('employee.pos.checkout') }}', {
                 method: 'POST',
                 headers: {

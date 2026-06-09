@@ -470,7 +470,7 @@
         .badge-blue {
             background: #eef4ff;
             color: #004d99;
-            border: 1px solid rgba(0,77,153,0.1);
+            border: 1px solid rgba(0, 77, 153, 0.1);
         }
 
         .btn-icon {
@@ -514,7 +514,6 @@
             margin-bottom: 12px;
             display: block;
         }
-
     </style>
     @stack('styles')
 </head>
@@ -570,7 +569,7 @@
     </div>
 
     <script>
-        (function() {
+        (function () {
             const clockEl = document.getElementById('mg-live-clock');
             const dateEl = document.getElementById('mg-live-date');
             if (!clockEl || !dateEl) return;
