@@ -28,61 +28,60 @@ class LocalSyncController extends Controller
     public function pushPending()
     {
         try {
-            // Tenter de se connecter à la base MySQL de destination
-            try {
-                DB::connection('mysql')->getPdo();
-            } catch (\Exception $e) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Impossible de se connecter à la base MySQL locale : ' . $e->getMessage()
-                ], 500);
-            }
+            $apiUrl = config('app.api_url', 'https://fescads.com/api');
+            $syncKey = config('app.sync_api_key', 'supermarche-sync-secret-2026');
 
             // Tables d'entités qui bénéficient de la colonne synced
             $tablesMapping = [
-                'users' => User::class,
-                'categories' => Category::class,
-                'suppliers' => Supplier::class,
-                'products' => Product::class,
-                'customers' => Customer::class,
-                'cash_sessions' => CashSession::class,
-                'sales' => Sale::class,
-                'sale_items' => SaleItem::class,
-                'debt_payments' => DebtPayment::class,
-                'restock_requests' => RestockRequest::class
+                'users', 'categories', 'suppliers', 'products', 'customers',
+                'cash_sessions', 'sales', 'sale_items', 'debt_payments', 'restock_requests'
             ];
 
-            $syncedCount = 0;
-            $errorsCount = 0;
+            $payload = [];
+            $totalCount = 0;
 
-            foreach ($tablesMapping as $table => $modelClass) {
+            foreach ($tablesMapping as $table) {
                 // Trouver toutes les lignes non synchronisées dans SQLite local
-                $nonSyncedRecords = DB::table($table)->where('synced', 0)->get();
+                $nonSyncedRecords = DB::table($table)->where('synced', 0)->get()->map(fn($item) => (array)$item)->toArray();
 
-                foreach ($nonSyncedRecords as $record) {
-                    try {
-                        $attributes = (array) $record;
-                        $attributes['synced'] = 1;
+                if (!empty($nonSyncedRecords)) {
+                    $payload[$table] = $nonSyncedRecords;
+                    $totalCount += count($nonSyncedRecords);
+                }
+            }
 
-                        // Pousser l'insertion ou la mise à jour correspondante dans MySQL locale
-                        DB::connection('mysql')->table($table)->updateOrInsert(['id' => $record->id], $attributes);
+            if ($totalCount === 0) {
+                return response()->json([
+                    'success' => true,
+                    'message' => "0 opération(s) synchronisée(s) avec succès.",
+                    'synced_count' => 0,
+                    'errors_count' => 0
+                ]);
+            }
 
-                        // Mettre à jour l'enregistrement en SQLite
-                        DB::table($table)->where('id', $record->id)->update(['synced' => 1]);
-                        $syncedCount++;
-                    } catch (\Exception $ex) {
-                        $errorsCount++;
-                        Log::error("Erreur de poussée sync pour la table {$table} (ID : {$record->id}) : " . $ex->getMessage());
+            // Pousser vers la BD MySQL locale directement
+            DB::connection('mysql')->transaction(function() use ($payload, $tablesMapping) {
+                foreach ($payload as $table => $records) {
+                    foreach ($records as $record) {
+                        $attributes = $record;
+                        unset($attributes['synced']); // On ne synchronise pas cette colonne vers MySQL
+                        DB::connection('mysql')->table($table)->updateOrInsert(['id' => $record['id']], $attributes);
                     }
                 }
+            });
+
+            // Mettre à jour l'enregistrement en SQLite
+            foreach ($tablesMapping as $table) {
+                DB::table($table)->where('synced', 0)->update(['synced' => 1]);
             }
 
             return response()->json([
                 'success' => true,
-                'message' => "{$syncedCount} opération(s) synchronisée(s) avec succès.",
-                'synced_count' => $syncedCount,
-                'errors_count' => $errorsCount
+                'message' => "{$totalCount} opération(s) synchronisée(s) avec succès vers MySQL.",
+                'synced_count' => $totalCount,
+                'errors_count' => 0
             ]);
+
         } catch (\Exception $e) {
             Log::error('LocalSyncController::pushPending error: ' . $e->getMessage());
             return response()->json([
@@ -98,37 +97,22 @@ class LocalSyncController extends Controller
     public function pullUpdates()
     {
         try {
-            Log::info('LocalSyncController::pullUpdates — Début du Pull direct DB MySQL');
+            Log::info('LocalSyncController::pullUpdates — Début du Pull via BD MySQL');
 
-            // Tenter de se connecter à la base MySQL locale
-            try {
-                DB::connection('mysql')->getPdo();
-            } catch (\Exception $e) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Impossible de se connecter à la base MySQL locale : ' . $e->getMessage()
-                ], 500);
-            }
-
-            // Récupérer directement les données depuis MySQL local
             $data = [
-                'users'         => DB::connection('mysql')->table('users')->get()->map(fn($item) => (array)$item)->toArray(),
-                'categories'    => DB::connection('mysql')->table('categories')->get()->map(fn($item) => (array)$item)->toArray(),
-                'suppliers'     => DB::connection('mysql')->table('suppliers')->get()->map(fn($item) => (array)$item)->toArray(),
-                'products'      => DB::connection('mysql')->table('products')->get()->map(fn($item) => (array)$item)->toArray(),
-                'customers'     => DB::connection('mysql')->table('customers')->get()->map(fn($item) => (array)$item)->toArray(),
-                'settings'      => (array) DB::connection('mysql')->table('settings')->first(),
-                'cash_sessions' => DB::connection('mysql')->table('cash_sessions')->get()->map(fn($item) => (array)$item)->toArray(),
-                'sales'         => DB::connection('mysql')->table('sales')->get()->map(function ($sale) {
-                    $saleArr = (array)$sale;
-                    $saleArr['items'] = DB::connection('mysql')->table('sale_items')
-                        ->where('sale_id', $sale->id)
-                        ->get()
-                        ->map(fn($item) => (array)$item)
-                        ->toArray();
-                    return $saleArr;
+                'users' => DB::connection('mysql')->table('users')->get()->map(fn($item) => (array)$item)->toArray(),
+                'categories' => DB::connection('mysql')->table('categories')->get()->map(fn($item) => (array)$item)->toArray(),
+                'suppliers' => DB::connection('mysql')->table('suppliers')->get()->map(fn($item) => (array)$item)->toArray(),
+                'products' => DB::connection('mysql')->table('products')->get()->map(fn($item) => (array)$item)->toArray(),
+                'customers' => DB::connection('mysql')->table('customers')->get()->map(fn($item) => (array)$item)->toArray(),
+                'settings' => DB::connection('mysql')->table('settings')->first() ? (array)DB::connection('mysql')->table('settings')->first() : [],
+                'cash_sessions' => DB::connection('mysql')->table('cash_sessions')->where('opened_at', '>=', now()->subDays(30))->get()->map(fn($item) => (array)$item)->toArray(),
+                'sales' => DB::connection('mysql')->table('sales')->where('created_at', '>=', now()->subDays(30))->get()->map(function ($sale) {
+                    $arr = (array)$sale;
+                    $arr['items'] = DB::connection('mysql')->table('sale_items')->where('sale_id', $sale->id)->get()->map(fn($item) => (array)$item)->toArray();
+                    return $arr;
                 })->toArray(),
-                'debt_payments' => DB::connection('mysql')->table('debt_payments')->get()->map(fn($item) => (array)$item)->toArray(),
+                'debt_payments' => DB::connection('mysql')->table('debt_payments')->where('created_at', '>=', now()->subDays(30))->get()->map(fn($item) => (array)$item)->toArray(),
                 'restock_requests' => DB::connection('mysql')->table('restock_requests')->get()->map(fn($item) => (array)$item)->toArray(),
             ];
 
@@ -422,12 +406,12 @@ class LocalSyncController extends Controller
             DB::connection('mysql')->getPdo();
             return response()->json([
                 'success' => true,
-                'message' => 'Connexion MySQL locale établie avec succès.'
+                'message' => 'Connexion au serveur MySQL local établie avec succès.'
             ]);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'MySQL déconnecté : ' . $e->getMessage()
+                'message' => 'Serveur MySQL déconnecté : ' . $e->getMessage()
             ]);
         }
     }

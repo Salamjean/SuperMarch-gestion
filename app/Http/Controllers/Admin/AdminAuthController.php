@@ -24,6 +24,9 @@ class AdminAuthController extends Controller
             'password'   => ['required'],
         ]);
 
+        // Suppression de la synchronisation automatique depuis le serveur externe
+        // (l'application fonctionne désormais 100% localement et utilise la base de données initialisée)
+
         if (!Auth::attempt(['login_code' => $credentials['login_code'], 'password' => $credentials['password']], $request->boolean('remember'))) {
             return back()->withErrors([
                 'login_code' => 'Code ID ou mot de passe incorrect.',

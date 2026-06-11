@@ -219,6 +219,17 @@ function createWindow() {
         },
     );
 
+    // 🔥 Détection du retour en ligne pour la synchronisation automatique
+    win.webContents.on('did-finish-load', () => {
+        win.webContents.executeJavaScript(`
+            window.addEventListener('online', () => {
+                if (window.electronAPI && window.electronAPI.invoke) {
+                    window.electronAPI.invoke('sqlite-trigger-auto-sync');
+                }
+            });
+        `).catch(e => console.error("Erreur injection JS online:", e));
+    });
+
     // 🔥 Liens externes dans le navigateur
     win.webContents.setWindowOpenHandler(({ url }) => {
         shell.openExternal(url);
@@ -480,6 +491,18 @@ function initDatabase() {
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+async function triggerAutoSync() {
+    try {
+        const targetUrl = "http://127.0.0.1:8000";
+        await fetch(`${targetUrl}/local/sync/push`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" }
+        });
+    } catch (e) {
+        // Ignorer silencieusement si hors-ligne
+    }
+}
+
 function now() {
     return new Date().toISOString().replace("T", " ").substring(0, 19);
 }
@@ -619,6 +642,7 @@ function registerIpcHandlers() {
                     .prepare("SELECT * FROM cash_sessions WHERE id = ?")
                     .get(Number(res.lastInsertRowid));
 
+                triggerAutoSync();
                 return {
                     success: true,
                     message: "Caisse ouverte avec succès.",
@@ -688,6 +712,7 @@ function registerIpcHandlers() {
                     .prepare("SELECT * FROM cash_sessions WHERE id = ?")
                     .get(session.id);
 
+                triggerAutoSync();
                 return {
                     success: true,
                     message: "Caisse clôturée avec succès.",
@@ -853,6 +878,7 @@ function registerIpcHandlers() {
 
             const saleWithItems = { ...sale, items: saleItems };
 
+            triggerAutoSync();
             return {
                 success: true,
                 message: "Vente enregistrée avec succès.",
@@ -938,6 +964,7 @@ function registerIpcHandlers() {
                 "UPDATE sales SET status = 'returned', refunded_amount = ?, updated_at = ?, synced = 0 WHERE id = ?",
             ).run(sale.total_amount, ts, saleId);
 
+            triggerAutoSync();
             return {
                 success: true,
                 message:
@@ -974,6 +1001,7 @@ function registerIpcHandlers() {
                 .prepare("SELECT * FROM customers WHERE id = ?")
                 .get(Number(res.lastInsertRowid));
 
+            triggerAutoSync();
             return {
                 success: true,
                 message: "Client enregistré avec succès.",
@@ -1035,6 +1063,7 @@ function registerIpcHandlers() {
                     .prepare("SELECT * FROM customers WHERE id = ?")
                     .get(customerId);
 
+                triggerAutoSync();
                 return {
                     success: true,
                     message: `Encaissement de ${amountToPay.toFixed(0)} FCFA enregistré avec succès.`,
@@ -1450,6 +1479,14 @@ function registerIpcHandlers() {
                 message: "Erreur lors du téléchargement : " + e.message,
             };
         }
+    });
+
+    /**
+     * AUTO-SYNC BACKGROUND
+     */
+    ipcMain.handle("sqlite-trigger-auto-sync", async () => {
+        await triggerAutoSync();
+        return { success: true };
     });
 
     /**

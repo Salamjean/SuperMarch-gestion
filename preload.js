@@ -20,6 +20,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
             // Sync
             "sqlite-pull",
             "sqlite-push",
+            "sqlite-trigger-auto-sync",
             "sqlite-pending-count",
             // Lecture
             "sqlite-get-products",

@@ -724,9 +724,6 @@
             }
         });
 
-        // ════════════════════════════════════════════════════════════════════════
-        //  SYNC MANAGER — SQLite ↔ MySQL (Admin Sync & PUSH)
-        // ════════════════════════════════════════════════════════════════════════
         const isElectron = typeof window.electronAPI !== 'undefined';
 
         async function checkActualConnection() {

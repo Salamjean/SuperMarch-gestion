@@ -743,9 +743,6 @@
     @stack('scripts')
 
     <script>
-        // ════════════════════════════════════════════════════════════════════════
-        //  SYNC MANAGER — SQLite ↔ MySQL (PHP Backend Sync)
-        // ════════════════════════════════════════════════════════════════════════
         const isElectron = typeof window.electronAPI !== 'undefined';
 
         async function checkActualConnection() {

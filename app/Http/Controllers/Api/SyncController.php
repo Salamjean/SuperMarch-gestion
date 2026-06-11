@@ -89,6 +89,53 @@ class SyncController extends Controller
     }
 
     /**
+     * BULK PUSH — Reçoit toutes les entités SQLite modifiées et les met à jour ou les insère
+     *
+     * POST /api/sync/bulk-push
+     * Body: { "data": { "users": [...], "products": [...] } }
+     */
+    public function bulkPush(Request $request)
+    {
+        if (!$this->checkSyncKey($request)) {
+            return response()->json(['error' => 'Clé API invalide.'], 401);
+        }
+
+        try {
+            $data = $request->input('data', []);
+            DB::transaction(function () use ($data) {
+                $mapping = [
+                    'users' => \App\Models\User::class,
+                    'categories' => \App\Models\Category::class,
+                    'suppliers' => \App\Models\Supplier::class,
+                    'products' => \App\Models\Product::class,
+                    'customers' => \App\Models\Customer::class,
+                    'cash_sessions' => \App\Models\CashSession::class,
+                    'sales' => \App\Models\Sale::class,
+                    'sale_items' => \App\Models\SaleItem::class,
+                    'debt_payments' => \App\Models\DebtPayment::class,
+                    'restock_requests' => \App\Models\RestockRequest::class
+                ];
+
+                foreach ($mapping as $table => $modelClass) {
+                    if (isset($data[$table]) && is_array($data[$table])) {
+                        foreach ($data[$table] as $record) {
+                            $attributes = $record;
+                            unset($attributes['synced']);
+                            $modelClass::updateOrCreate(['id' => $record['id']], $attributes);
+                        }
+                    }
+                }
+            });
+
+            return response()->json(['success' => true]);
+
+        } catch (\Exception $e) {
+            Log::error('SyncController::bulkPush error: ' . $e->getMessage());
+            return response()->json(['error' => 'Erreur lors du bulk push : ' . $e->getMessage()], 500);
+        }
+    }
+
+    /**
      * PUSH — Reçoit les opérations hors-ligne depuis Electron et les applique dans MySQL.
      *
      * POST /api/sync/push

@@ -6,12 +6,23 @@ use Symfony\Component\Console\Input\ArgvInput;
 
 define('LARAVEL_START', microtime(true));
 
+// Définir un répertoire temporaire local valide pour éviter le warning tempnam() sous Windows
+$localTempDir = realpath(__DIR__ . '/storage/framework/cache');
+if ($localTempDir) {
+    putenv("TMPDIR={$localTempDir}");
+    putenv("TMP={$localTempDir}");
+    putenv("TEMP={$localTempDir}");
+}
+
 // Register the Composer autoloader...
 require __DIR__.'/vendor/autoload.php';
 
 // Bootstrap Laravel and handle the command...
 /** @var Application $app */
 $app = require_once __DIR__.'/bootstrap/app.php';
+
+// Masquer les warnings, notices et deprecations après le boot pour éviter les crashs de tempnam() sous Windows
+error_reporting(E_ALL & ~E_WARNING & ~E_NOTICE & ~E_DEPRECATED);
 
 $status = $app->handleCommand(new ArgvInput);
 

@@ -16,7 +16,10 @@ use Illuminate\Support\Facades\Route;
 // Pull : télécharger toutes les données MySQL → SQLite
 Route::get('/sync/pull', [SyncController::class, 'pull']);
 
-// Push : envoyer les opérations hors-ligne SQLite → MySQL
+// Bulk Push : recevoir toutes les opérations hors-ligne de SQLite
+Route::post('/sync/bulk-push', [SyncController::class, 'bulkPush']);
+
+// Push : envoyer les opérations hors-ligne SQLite → MySQL (Legacy)
 Route::post('/sync/push', [SyncController::class, 'push']);
 
 // Ping pour vérifier la connectivité

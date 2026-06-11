@@ -38,7 +38,8 @@
         ],
         "win": {
             "target": "nsis",
-            "icon": "public/logo/icon_square.png"
+            "icon": "public/logo/icon_square.png",
+            "signAndEditExecutable": false
         },
         "nsis": {
             "oneClick": false,

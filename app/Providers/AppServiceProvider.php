@@ -21,6 +21,14 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Ignorer silencieusement l'avertissement tempnam() sous Windows pour éviter les exceptions ErrorException
+        set_error_handler(function ($severity, $message, $file, $line) {
+            if (str_contains($message, 'tempnam(): file created in the system\'s temporary directory')) {
+                return true; // Ignore l'erreur
+            }
+            return false; // Laisse le handler d'erreurs par défaut de Laravel
+        }, E_WARNING | E_NOTICE | E_DEPRECATED);
+
         Schema::defaultStringLength(191);
 
         Paginator::defaultView('vendor.pagination.custom');
@@ -70,15 +78,33 @@ class AppServiceProvider extends ServiceProvider
         $this->registerLocalSyncObservers();
     }
 
+    private static ?bool $mysqlConnected = null;
+
+    /**
+     * Vérifie la connexion MySQL et met le résultat en cache pour la requête en cours
+     */
+    private static function checkMysqlConnection(): bool
+    {
+        if (self::$mysqlConnected !== null) {
+            return self::$mysqlConnected;
+        }
+
+        try {
+            $mysqlConn = \Illuminate\Support\Facades\DB::connection('mysql');
+            $mysqlConn->getPdo();
+            self::$mysqlConnected = true;
+        } catch (\Exception $e) {
+            self::$mysqlConnected = false;
+        }
+
+        return self::$mysqlConnected;
+    }
+
     /**
      * Enregistre les observateurs Eloquent en local pour alimenter la sync_queue
      */
     private function registerLocalSyncObservers(): void
     {
-        if (config('app.env') !== 'local') {
-            return;
-        }
-
         $models = [
             \App\Models\Product::class => 'product',
             \App\Models\Customer::class => 'customer',
@@ -102,11 +128,9 @@ class AppServiceProvider extends ServiceProvider
                 }
 
                 // Essai de connectivité MySQL pour mettre à jour en doublon direct
-                try {
-                    $mysqlConn = \Illuminate\Support\Facades\DB::connection('mysql');
-                    $mysqlConn->getPdo();
+                if (self::checkMysqlConnection()) {
                     $model->synced = 1;
-                } catch (\Exception $e) {
+                } else {
                     $model->synced = 0;
                 }
             });
@@ -138,12 +162,13 @@ class AppServiceProvider extends ServiceProvider
                     return;
                 }
 
-                try {
-                    $mysqlConn = \Illuminate\Support\Facades\DB::connection('mysql');
-                    $mysqlConn->getPdo();
-                    $mysqlConn->table($model->getTable())->where('id', $model->id)->delete();
-                } catch (\Exception $e) {
-                    // Suppression en attente (on le laisse ainsi pour SQLite)
+                if (self::checkMysqlConnection()) {
+                    try {
+                        $mysqlConn = \Illuminate\Support\Facades\DB::connection('mysql');
+                        $mysqlConn->table($model->getTable())->where('id', $model->id)->delete();
+                    } catch (\Exception $e) {
+                        // Suppression en attente (on le laisse ainsi pour SQLite)
+                    }
                 }
             });
         }
