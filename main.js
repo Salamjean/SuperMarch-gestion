@@ -148,6 +148,29 @@ function createWindow() {
                         `Serveur local détecté (tentative ${attempt}). Redirection vers`,
                         LOCAL_DEV_URL,
                     );
+
+                    // 🔄 PULL automatique : récupérer les données MySQL → SQLite avant login
+                    try {
+                        console.log("🔄 Pull automatique depuis MySQL production...");
+                        const pullResponse = await fetch(`${LOCAL_DEV_URL}/local/sync/pull`, {
+                            method: "POST",
+                            headers: {
+                                "Content-Type": "application/json",
+                                "X-Requested-With": "XMLHttpRequest",
+                            },
+                        });
+                        if (pullResponse.ok) {
+                            const pullData = await pullResponse.json();
+                            if (pullData.success) {
+                                console.log("✅ Pull réussi :", pullData.message);
+                            } else {
+                                console.warn("⚠️ Pull échoué :", pullData.message);
+                            }
+                        }
+                    } catch (pullErr) {
+                        console.warn("⚠️ Pull ignoré (hors-ligne ou erreur) :", pullErr.message);
+                    }
+
                     win.loadURL(LOCAL_DEV_URL);
                     return;
                 }
@@ -160,6 +183,7 @@ function createWindow() {
         // Si le serveur local n'est pas lancé, afficher la page hors-ligne
         win.loadFile(path.join(__dirname, "public", "offline.html"));
     }, 2500);
+
 
     // 🌐 Gestion du mode hors connexion
     win.webContents.on(

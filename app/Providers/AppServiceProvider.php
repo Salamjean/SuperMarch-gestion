@@ -78,26 +78,18 @@ class AppServiceProvider extends ServiceProvider
         $this->registerLocalSyncObservers();
     }
 
-    private static ?bool $mysqlConnected = null;
-
     /**
-     * Vérifie la connexion MySQL et met le résultat en cache pour la requête en cours
+     * Vérifie la connexion MySQL (sans cache pour toujours avoir l'état réel)
      */
     private static function checkMysqlConnection(): bool
     {
-        if (self::$mysqlConnected !== null) {
-            return self::$mysqlConnected;
-        }
-
         try {
-            $mysqlConn = \Illuminate\Support\Facades\DB::connection('mysql');
-            $mysqlConn->getPdo();
-            self::$mysqlConnected = true;
+            // Forcer une nouvelle connexion à chaque vérification
+            \Illuminate\Support\Facades\DB::connection('mysql')->getPdo();
+            return true;
         } catch (\Exception $e) {
-            self::$mysqlConnected = false;
+            return false;
         }
-
-        return self::$mysqlConnected;
     }
 
     /**
@@ -148,11 +140,14 @@ class AppServiceProvider extends ServiceProvider
                         $attributes['synced'] = 1;
                         unset($attributes['items']); // nettoiement au cas où
 
+                        // Désactiver FK temporairement pour éviter les violations d'ordre
+                        $mysqlConn->statement('SET FOREIGN_KEY_CHECKS=0;');
                         $mysqlConn->table($tableName)->updateOrInsert(['id' => $model->id], $attributes);
+                        $mysqlConn->statement('SET FOREIGN_KEY_CHECKS=1;');
                     } catch (\Exception $e) {
-                        \Illuminate\Support\Facades\DB::table($model->getTable())
-                            ->where('id', $model->id)
-                            ->update(['synced' => 0]);
+                        // Ne pas remettre synced=0 ici pour éviter la boucle infinie
+                        // Le push batch (pushPending) se chargera de la synchronisation
+                        \Illuminate\Support\Facades\Log::warning('Sync immédiate échouée pour ' . get_class($model) . ' ID=' . $model->id . ': ' . $e->getMessage());
                     }
                 }
             });

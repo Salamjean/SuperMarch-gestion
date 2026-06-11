@@ -23,357 +23,211 @@ use App\Models\RestockRequest;
 class LocalSyncController extends Controller
 {
     /**
-     * PUSH : Envoie les opérations hors-ligne de SQLite vers la base de données MySQL locale
+     * PUSH : Envoie les opérations hors-ligne de SQLite vers MySQL (production)
+     * Ordre strict pour respecter les clés étrangères
      */
     public function pushPending()
     {
         try {
-            $apiUrl = config('app.api_url', 'https://fescads.com/api');
-            $syncKey = config('app.sync_api_key', 'supermarche-sync-secret-2026');
-
-            // Tables d'entités qui bénéficient de la colonne synced
-            $tablesMapping = [
+            // Ordre strict pour respecter les clés étrangères
+            $tablesOrder = [
                 'users', 'categories', 'suppliers', 'products', 'customers',
                 'cash_sessions', 'sales', 'sale_items', 'debt_payments', 'restock_requests'
             ];
 
-            $payload = [];
+            $payload    = [];
             $totalCount = 0;
 
-            foreach ($tablesMapping as $table) {
-                // Trouver toutes les lignes non synchronisées dans SQLite local
+            foreach ($tablesOrder as $table) {
                 $nonSyncedRecords = DB::table($table)->where('synced', 0)->get()->map(fn($item) => (array)$item)->toArray();
-
                 if (!empty($nonSyncedRecords)) {
                     $payload[$table] = $nonSyncedRecords;
-                    $totalCount += count($nonSyncedRecords);
+                    $totalCount     += count($nonSyncedRecords);
                 }
             }
 
             if ($totalCount === 0) {
                 return response()->json([
-                    'success' => true,
-                    'message' => "0 opération(s) synchronisée(s) avec succès.",
+                    'success'      => true,
+                    'message'      => "0 opération(s) synchronisée(s) avec succès.",
                     'synced_count' => 0,
-                    'errors_count' => 0
+                    'errors_count' => 0,
                 ]);
             }
 
-            // Pousser vers la BD MySQL locale directement
-            DB::connection('mysql')->transaction(function() use ($payload, $tablesMapping) {
-                foreach ($payload as $table => $records) {
-                    foreach ($records as $record) {
-                        $attributes = $record;
-                        unset($attributes['synced']); // On ne synchronise pas cette colonne vers MySQL
-                        DB::connection('mysql')->table($table)->updateOrInsert(['id' => $record['id']], $attributes);
+            // Désactiver les FK MySQL EN DEHORS de la transaction pour être effectif
+            DB::connection('mysql')->statement('SET FOREIGN_KEY_CHECKS=0;');
+            try {
+                DB::connection('mysql')->transaction(function () use ($payload, $tablesOrder) {
+                    foreach ($tablesOrder as $table) {
+                        if (!isset($payload[$table])) continue;
+                        foreach ($payload[$table] as $record) {
+                            $attributes = $record;
+                            unset($attributes['synced']); // La colonne synced n'existe pas dans MySQL
+                            DB::connection('mysql')->table($table)->updateOrInsert(['id' => $record['id']], $attributes);
+                        }
                     }
-                }
-            });
+                });
+            } finally {
+                DB::connection('mysql')->statement('SET FOREIGN_KEY_CHECKS=1;');
+            }
 
-            // Mettre à jour l'enregistrement en SQLite
-            foreach ($tablesMapping as $table) {
+            // Marquer tout comme synchronisé dans SQLite
+            foreach ($tablesOrder as $table) {
                 DB::table($table)->where('synced', 0)->update(['synced' => 1]);
             }
 
             return response()->json([
-                'success' => true,
-                'message' => "{$totalCount} opération(s) synchronisée(s) avec succès vers MySQL.",
+                'success'      => true,
+                'message'      => "{$totalCount} opération(s) synchronisée(s) avec succès vers MySQL.",
                 'synced_count' => $totalCount,
-                'errors_count' => 0
+                'errors_count' => 0,
             ]);
 
         } catch (\Exception $e) {
             Log::error('LocalSyncController::pushPending error: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
-                'message' => 'Erreur de synchronisation PUSH : ' . $e->getMessage()
+                'message' => 'Erreur de synchronisation PUSH : ' . $e->getMessage(),
             ], 500);
         }
     }
 
     /**
-     * PULL : Télécharge toutes les données MySQL locales vers la base SQLite locale
+     * PULL : Télécharge toutes les données MySQL vers la base SQLite locale
+     * Utilise DB::table() direct + PRAGMA foreign_keys=OFF pour éviter les violations FK SQLite
      */
     public function pullUpdates()
     {
         try {
             Log::info('LocalSyncController::pullUpdates — Début du Pull via BD MySQL');
 
-            $data = [
-                'users' => DB::connection('mysql')->table('users')->get()->map(fn($item) => (array)$item)->toArray(),
-                'categories' => DB::connection('mysql')->table('categories')->get()->map(fn($item) => (array)$item)->toArray(),
-                'suppliers' => DB::connection('mysql')->table('suppliers')->get()->map(fn($item) => (array)$item)->toArray(),
-                'products' => DB::connection('mysql')->table('products')->get()->map(fn($item) => (array)$item)->toArray(),
-                'customers' => DB::connection('mysql')->table('customers')->get()->map(fn($item) => (array)$item)->toArray(),
-                'settings' => DB::connection('mysql')->table('settings')->first() ? (array)DB::connection('mysql')->table('settings')->first() : [],
-                'cash_sessions' => DB::connection('mysql')->table('cash_sessions')->where('opened_at', '>=', now()->subDays(30))->get()->map(fn($item) => (array)$item)->toArray(),
-                'sales' => DB::connection('mysql')->table('sales')->where('created_at', '>=', now()->subDays(30))->get()->map(function ($sale) {
-                    $arr = (array)$sale;
-                    $arr['items'] = DB::connection('mysql')->table('sale_items')->where('sale_id', $sale->id)->get()->map(fn($item) => (array)$item)->toArray();
-                    return $arr;
-                })->toArray(),
-                'debt_payments' => DB::connection('mysql')->table('debt_payments')->where('created_at', '>=', now()->subDays(30))->get()->map(fn($item) => (array)$item)->toArray(),
-                'restock_requests' => DB::connection('mysql')->table('restock_requests')->get()->map(fn($item) => (array)$item)->toArray(),
+            // Récupérer toutes les données depuis MySQL dans le bon ordre (parents avant enfants)
+            $users        = DB::connection('mysql')->table('users')->get()->map(fn($i) => (array)$i)->toArray();
+            $categories   = DB::connection('mysql')->table('categories')->get()->map(fn($i) => (array)$i)->toArray();
+            $suppliers    = DB::connection('mysql')->table('suppliers')->get()->map(fn($i) => (array)$i)->toArray();
+            $products     = DB::connection('mysql')->table('products')->get()->map(fn($i) => (array)$i)->toArray();
+            $customers    = DB::connection('mysql')->table('customers')->get()->map(fn($i) => (array)$i)->toArray();
+            $settings     = DB::connection('mysql')->table('settings')->first();
+            $cashSessions = DB::connection('mysql')->table('cash_sessions')->get()->map(fn($i) => (array)$i)->toArray();
+            $sales        = DB::connection('mysql')->table('sales')->get()->map(fn($i) => (array)$i)->toArray();
+            $saleItems    = DB::connection('mysql')->table('sale_items')->get()->map(fn($i) => (array)$i)->toArray();
+            $debtPayments = DB::connection('mysql')->table('debt_payments')->get()->map(fn($i) => (array)$i)->toArray();
+            $restockReqs  = DB::connection('mysql')->table('restock_requests')->get()->map(fn($i) => (array)$i)->toArray();
+
+            // Désactiver les clés étrangères SQLite AVANT la transaction
+            DB::connection('sqlite')->statement('PRAGMA foreign_keys = OFF;');
+            config(['app.is_syncing_pull' => true]);
+
+            try {
+                DB::connection('sqlite')->transaction(function () use (
+                    $users, $categories, $suppliers, $products, $customers,
+                    $settings, $cashSessions, $sales, $saleItems, $debtPayments, $restockReqs
+                ) {
+                    // 1. Users
+                    foreach ($users as $u) {
+                        $attrs = $u;
+                        $attrs['synced'] = 1;
+                        DB::table('users')->updateOrInsert(['id' => $u['id']], $attrs);
+                    }
+
+                    // 2. Categories
+                    foreach ($categories as $c) {
+                        $attrs = $c;
+                        $attrs['synced'] = 1;
+                        DB::table('categories')->updateOrInsert(['id' => $c['id']], $attrs);
+                    }
+
+                    // 3. Suppliers
+                    foreach ($suppliers as $s) {
+                        $attrs = $s;
+                        $attrs['synced'] = 1;
+                        DB::table('suppliers')->updateOrInsert(['id' => $s['id']], $attrs);
+                    }
+
+                    // 4. Products
+                    foreach ($products as $p) {
+                        $attrs = $p;
+                        $attrs['synced'] = 1;
+                        DB::table('products')->updateOrInsert(['id' => $p['id']], $attrs);
+                    }
+
+                    // 5. Customers
+                    foreach ($customers as $c) {
+                        $attrs = $c;
+                        $attrs['synced'] = 1;
+                        DB::table('customers')->updateOrInsert(['id' => $c['id']], $attrs);
+                    }
+
+                    // 6. Settings
+                    if ($settings) {
+                        $sArr = (array) $settings;
+                        DB::table('settings')->updateOrInsert(['id' => $sArr['id']], $sArr);
+                    }
+
+                    // 7. Cash Sessions (parents des sales)
+                    foreach ($cashSessions as $cs) {
+                        $attrs = $cs;
+                        $attrs['synced'] = 1;
+                        DB::table('cash_sessions')->updateOrInsert(['id' => $cs['id']], $attrs);
+                    }
+
+                    // 8. Sales (dépend de cash_sessions + users + customers)
+                    foreach ($sales as $sale) {
+                        $attrs = $sale;
+                        $attrs['synced'] = 1;
+                        DB::table('sales')->updateOrInsert(['id' => $sale['id']], $attrs);
+                    }
+
+                    // 9. Sale Items (dépend de sales + products)
+                    foreach ($saleItems as $item) {
+                        $attrs = $item;
+                        $attrs['synced'] = 1;
+                        DB::table('sale_items')->updateOrInsert(['id' => $item['id']], $attrs);
+                    }
+
+                    // 10. Debt Payments (dépend de customers + users + cash_sessions)
+                    foreach ($debtPayments as $dp) {
+                        $attrs = $dp;
+                        $attrs['synced'] = 1;
+                        DB::table('debt_payments')->updateOrInsert(['id' => $dp['id']], $attrs);
+                    }
+
+                    // 11. Restock Requests (dépend de products + users)
+                    foreach ($restockReqs as $r) {
+                        $attrs = $r;
+                        $attrs['synced'] = 1;
+                        DB::table('restock_requests')->updateOrInsert(['id' => $r['id']], $attrs);
+                    }
+                });
+            } finally {
+                // Toujours réactiver les FK SQLite même en cas d'erreur
+                DB::connection('sqlite')->statement('PRAGMA foreign_keys = ON;');
+                config(['app.is_syncing_pull' => false]);
+            }
+
+            $counts = [
+                'users'     => count($users),
+                'products'  => count($products),
+                'sales'     => count($sales),
+                'customers' => count($customers),
             ];
 
-            // Désactiver temporairement les observateurs lors du PULL pour éviter le loop de sync_queue
-            // et utiliser les transactions de base de données
-            config(['app.is_syncing_pull' => true]);
-            DB::transaction(function () use ($data) {
-
-                // 1. Users
-                if (isset($data['users'])) {
-                    foreach ($data['users'] as $u) {
-                        $existing = User::find($u['id']);
-                        $userData = [
-                            'name' => $u['name'],
-                            'email' => $u['email'],
-                            'role' => $u['role'] ?? 'employee',
-                            'phone' => $u['phone'] ?? null,
-                            'address' => $u['address'] ?? null,
-                            'gender' => $u['gender'] ?? null,
-                            'login_code' => $u['login_code'] ?? null,
-                            'is_blocked' => $u['is_blocked'] ?? 0,
-                            'created_at' => $u['created_at'] ?? null,
-                            'updated_at' => $u['updated_at'] ?? null,
-                        ];
-
-                        if (isset($u['password'])) {
-                            $userData['password'] = $u['password'];
-                        } elseif (!$existing) {
-                            // Si l'utilisateur n'existe pas en local et qu'on n'a pas de mot de passe,
-                            // on définit un mot de passe par défaut temporaire (ex: "supermarche2026" ou "password")
-                            $userData['password'] = bcrypt('123456');
-                        }
-
-                        User::updateOrCreate(
-                            ['id' => $u['id']],
-                            $userData
-                        );
-                    }
-                }
-
-                // 2. Categories
-                if (isset($data['categories'])) {
-                    foreach ($data['categories'] as $c) {
-                        Category::updateOrCreate(
-                            ['id' => $c['id']],
-                            [
-                                'name' => $c['name'],
-                                'slug' => $c['slug'] ?? null,
-                                'description' => $c['description'] ?? null,
-                                'color' => $c['color'] ?? '#004d99',
-                                'is_active' => $c['is_active'] ?? 1,
-                                'created_by' => $c['created_by'] ?? null,
-                                'created_at' => $c['created_at'] ?? null,
-                                'updated_at' => $c['updated_at'] ?? null,
-                            ]
-                        );
-                    }
-                }
-
-                // 3. Suppliers
-                if (isset($data['suppliers'])) {
-                    foreach ($data['suppliers'] as $s) {
-                        Supplier::updateOrCreate(
-                            ['id' => $s['id']],
-                            [
-                                'name' => $s['name'],
-                                'email' => $s['email'] ?? null,
-                                'phone' => $s['phone'] ?? null,
-                                'contact_person' => $s['contact_person'] ?? null,
-                                'address' => $s['address'] ?? null,
-                                'city' => $s['city'] ?? null,
-                                'website' => $s['website'] ?? null,
-                                'is_active' => $s['is_active'] ?? 1,
-                                'notes' => $s['notes'] ?? null,
-                                'created_at' => $s['created_at'] ?? null,
-                                'updated_at' => $s['updated_at'] ?? null,
-                            ]
-                        );
-                    }
-                }
-
-                // 4. Products
-                if (isset($data['products'])) {
-                    foreach ($data['products'] as $p) {
-                        Product::updateOrCreate(
-                            ['id' => $p['id']],
-                            [
-                                'name' => $p['name'],
-                                'slug' => $p['slug'] ?? null,
-                                'reference' => $p['reference'] ?? null,
-                                'qr_code' => $p['qr_code'] ?? null,
-                                'category_name' => $p['category_name'] ?? null,
-                                'supplier_id' => $p['supplier_id'] ?? null,
-                                'price' => $p['price'] ?? 0,
-                                'stock' => $p['stock'] ?? 0,
-                                'stock_threshold' => $p['stock_threshold'] ?? 5,
-                                'image' => $p['image'] ?? null,
-                                'description' => $p['description'] ?? null,
-                                'is_active' => $p['is_active'] ?? 1,
-                                'created_by' => $p['created_by'] ?? null,
-                                'created_at' => $p['created_at'] ?? null,
-                                'updated_at' => $p['updated_at'] ?? null,
-                            ]
-                        );
-                    }
-                }
-
-                // 5. Customers
-                if (isset($data['customers'])) {
-                    foreach ($data['customers'] as $c) {
-                        Customer::updateOrCreate(
-                            ['id' => $c['id']],
-                            [
-                                'name' => $c['name'],
-                                'phone' => $c['phone'] ?? null,
-                                'email' => $c['email'] ?? null,
-                                'address' => $c['address'] ?? null,
-                                'loyalty_points' => $c['loyalty_points'] ?? 0,
-                                'debt_balance' => $c['debt_balance'] ?? 0,
-                                'is_credit_blocked' => $c['is_credit_blocked'] ?? 0,
-                                'created_at' => $c['created_at'] ?? null,
-                                'updated_at' => $c['updated_at'] ?? null,
-                            ]
-                        );
-                    }
-                }
-
-                // 6. Settings
-                if (isset($data['settings']) && !empty($data['settings'])) {
-                    $s = $data['settings'];
-                    Setting::updateOrCreate(
-                        ['id' => $s['id']],
-                        [
-                            'store_name' => $s['store_name'] ?? 'SUPERMARCHÉ PRO',
-                            'phone' => $s['phone'] ?? '+225 07 00 00 00 00',
-                            'address' => $s['address'] ?? 'Abidjan, Cocody Riviera Palmeraie',
-                            'email' => $s['email'] ?? null,
-                            'invoice_footer' => $s['invoice_footer'] ?? null,
-                            'invoice_format' => $s['invoice_format'] ?? 'ticket',
-                            'created_at' => $s['created_at'] ?? null,
-                            'updated_at' => $s['updated_at'] ?? null,
-                        ]
-                    );
-                }
-
-                // 7. Cash Sessions (Récents)
-                if (isset($data['cash_sessions'])) {
-                    foreach ($data['cash_sessions'] as $cs) {
-                        CashSession::updateOrCreate(
-                            ['id' => $cs['id']],
-                            [
-                                'user_id' => $cs['user_id'],
-                                'opening_balance' => $cs['opening_balance'],
-                                'expected_closing_balance' => $cs['expected_closing_balance'] ?? null,
-                                'actual_closing_balance' => $cs['actual_closing_balance'] ?? null,
-                                'difference' => $cs['difference'] ?? null,
-                                'opened_at' => $cs['opened_at'] ?? null,
-                                'closed_at' => $cs['closed_at'] ?? null,
-                                'status' => $cs['status'] ?? 'open',
-                                'created_at' => $cs['created_at'] ?? null,
-                                'updated_at' => $cs['updated_at'] ?? null,
-                                'synced' => 1,
-                            ]
-                        );
-                    }
-                }
-
-                // 8. Sales + items (Récents)
-                if (isset($data['sales'])) {
-                    foreach ($data['sales'] as $sale) {
-                        Sale::updateOrCreate(
-                            ['id' => $sale['id']],
-                            [
-                                'user_id' => $sale['user_id'],
-                                'cash_session_id' => $sale['cash_session_id'] ?? null,
-                                'customer_id' => $sale['customer_id'] ?? null,
-                                'total_amount' => $sale['total_amount'],
-                                'amount_received' => $sale['amount_received'] ?? 0,
-                                'change_amount' => $sale['change_amount'] ?? 0,
-                                'payment_method' => $sale['payment_method'] ?? 'cash',
-                                'reference' => $sale['reference'] ?? null,
-                                'status' => $sale['status'] ?? 'completed',
-                                'refunded_amount' => $sale['refunded_amount'] ?? 0,
-                                'created_at' => $sale['created_at'] ?? null,
-                                'updated_at' => $sale['updated_at'] ?? null,
-                                'synced' => 1,
-                            ]
-                        );
-
-                        if (isset($sale['items'])) {
-                            foreach ($sale['items'] as $item) {
-                                SaleItem::updateOrCreate(
-                                    ['id' => $item['id']],
-                                    [
-                                        'sale_id' => $item['sale_id'],
-                                        'product_id' => $item['product_id'],
-                                        'quantity' => $item['quantity'],
-                                        'unit_price' => $item['unit_price'],
-                                        'subtotal' => $item['subtotal'],
-                                        'returned_quantity' => $item['returned_quantity'] ?? 0,
-                                        'created_at' => $item['created_at'] ?? null,
-                                        'updated_at' => $item['updated_at'] ?? null,
-                                    ]
-                                );
-                            }
-                        }
-                    }
-                }
-
-                // 9. Debt Payments (Récents)
-                if (isset($data['debt_payments'])) {
-                    foreach ($data['debt_payments'] as $dp) {
-                        DebtPayment::updateOrCreate(
-                            ['id' => $dp['id']],
-                            [
-                                'customer_id' => $dp['customer_id'],
-                                'user_id' => $dp['user_id'],
-                                'cash_session_id' => $dp['cash_session_id'] ?? null,
-                                'amount' => $dp['amount'],
-                                'reference' => $dp['reference'] ?? null,
-                                'payment_method' => $dp['payment_method'] ?? 'cash',
-                                'created_at' => $dp['created_at'] ?? null,
-                                'updated_at' => $dp['updated_at'] ?? null,
-                                'synced' => 1,
-                            ]
-                        );
-                    }
-                }
-
-                // 10. Restock Requests
-                if (isset($data['restock_requests'])) {
-                    foreach ($data['restock_requests'] as $r) {
-                        RestockRequest::updateOrCreate(
-                            ['id' => $r['id']],
-                            [
-                                'product_id' => $r['product_id'] ?? null,
-                                'user_id' => $r['user_id'] ?? null,
-                                'status' => $r['status'] ?? 'pending',
-                                'quantity_requested' => $r['quantity_requested'] ?? 0,
-                                'quantity_received' => $r['quantity_received'] ?? 0,
-                                'created_at' => $r['created_at'] ?? null,
-                                'updated_at' => $r['updated_at'] ?? null,
-                                'synced' => 1,
-                            ]
-                        );
-                    }
-                }
-            });
-
-            config(['app.is_syncing_pull' => false]);
+            Log::info('LocalSyncController::pullUpdates — Pull terminé avec succès', $counts);
 
             return response()->json([
                 'success' => true,
-                'message' => 'Base SQLite locale mise à jour avec succès depuis le serveur en ligne.'
+                'message' => 'Base SQLite locale mise à jour avec succès depuis le serveur en ligne.',
+                'counts'  => $counts,
             ]);
+
         } catch (\Exception $e) {
+            DB::connection('sqlite')->statement('PRAGMA foreign_keys = ON;');
             config(['app.is_syncing_pull' => false]);
             Log::error('LocalSyncController::pullUpdates error: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
-                'message' => 'Erreur de synchronisation PULL : ' . $e->getMessage()
+                'message' => 'Erreur de synchronisation PULL : ' . $e->getMessage(),
             ], 500);
         }
     }
@@ -384,7 +238,10 @@ class LocalSyncController extends Controller
     public function getPendingCount()
     {
         try {
-            $tables = ['users', 'categories', 'suppliers', 'products', 'customers', 'cash_sessions', 'sales', 'sale_items', 'debt_payments', 'restock_requests'];
+            $tables = [
+                'users', 'categories', 'suppliers', 'products', 'customers',
+                'cash_sessions', 'sales', 'sale_items', 'debt_payments', 'restock_requests'
+            ];
             $count = 0;
             foreach ($tables as $t) {
                 if (Schema::hasTable($t)) {
@@ -398,7 +255,7 @@ class LocalSyncController extends Controller
     }
 
     /**
-     * Vérifie la connexion à la base MySQL locale
+     * Vérifie la connexion à la base MySQL de production
      */
     public function checkMysqlConnection()
     {
@@ -406,12 +263,12 @@ class LocalSyncController extends Controller
             DB::connection('mysql')->getPdo();
             return response()->json([
                 'success' => true,
-                'message' => 'Connexion au serveur MySQL local établie avec succès.'
+                'message' => 'Connexion au serveur MySQL établie avec succès.',
             ]);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Serveur MySQL déconnecté : ' . $e->getMessage()
+                'message' => 'Serveur MySQL déconnecté : ' . $e->getMessage(),
             ]);
         }
     }
@@ -423,11 +280,11 @@ class LocalSyncController extends Controller
     {
         try {
             $table = match ($entityType) {
-                'sale' => 'sales',
-                'cash_session' => 'cash_sessions',
-                'debt_payment' => 'debt_payments',
+                'sale'            => 'sales',
+                'cash_session'    => 'cash_sessions',
+                'debt_payment'    => 'debt_payments',
                 'restock_request' => 'restock_requests',
-                default => null
+                default           => null,
             };
 
             if ($table) {

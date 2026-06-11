@@ -748,7 +748,7 @@
         async function checkActualConnection() {
             try {
                 const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 2000);
+                const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s de timeout
                 const response = await fetch('{{ route('local.sync.check-mysql') }}', {
                     method: 'GET',
                     cache: 'no-store',
@@ -920,7 +920,7 @@
 
         window.addEventListener('online', () => updateConnectionPill());
         window.addEventListener('offline', () => updateConnectionPill());
-        setInterval(() => updateConnectionPill(), 10000); // Ping toutes les 10s
+        setInterval(() => updateConnectionPill(), 30000); // Ping toutes les 30s (évite les faux positifs)
         setInterval(() => {
             if (_isOnline) checkAndSyncOffline();
         }, 60000); // Auto-push toutes les 60s

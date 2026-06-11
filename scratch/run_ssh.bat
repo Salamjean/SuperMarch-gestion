@@ -1,0 +1,1 @@
+ssh -i "C:\Users\LENOVO\.ssh\infomaniak4_fixed.key" -o StrictHostKeyChecking=no ubuntu@83.228.206.120 "sudo mysql -e \"CREATE USER IF NOT EXISTS 'supermarche_user'@'%%' IDENTIFIED BY 'SuperMarcheSecureDB2026!'; GRANT ALL PRIVILEGES ON supermarche_db.* TO 'supermarche_user'@'%%'; FLUSH PRIVILEGES;\""
